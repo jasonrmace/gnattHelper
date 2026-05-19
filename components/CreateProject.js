@@ -64,30 +64,33 @@ const CreateProject = () => {
 
     return(
         <>
-            <Form.Group className="mb-3">
-                <Form.Label className="fw-bold small text-uppercase">New Project Name</Form.Label>
-                <Form.Control 
-                    type="text" 
-                    placeholder="Enter name..." 
-                    value={projectName}
-                    onChange={(e) => setProjectName(e.target.value)}
-                    disabled={isLoading}
-                />
-            </Form.Group>
-
-            <div className="d-grid gap-2">
+            <div className="bg-light p-3 rounded mb-4 border">
+                <Form.Group className="mb-2">
+                    <Form.Label className="fw-bold small text-uppercase text-muted">Create New Project</Form.Label>
+                    <Form.Control 
+                        size="sm"
+                        type="text" 
+                        placeholder="Project Name..." 
+                        value={projectName}
+                        onChange={(e) => setProjectName(e.target.value)}
+                        disabled={isLoading}
+                    />
+                </Form.Group>
                 <Button 
                     variant="primary" 
+                    size="sm" 
+                    className="w-100" 
                     onClick={handleCreate} 
-                    disabled={isLoading}
+                    disabled={isLoading || !projectName}
                 >
                     {isLoading ? (
                         <>
                             <Spinner as="span" animation="border" size="sm" role="status" aria-hidden="true" className="me-2" />
                             Working...
                         </>
-                    ) : "Create Project"}
+                    ) : "Add Project"}
                 </Button>
+                {status.msg && <div className={`text-${status.variant} small mt-2 fw-bold text-center`}>{status.msg}</div>}
             </div>
 
             {/* Alert Component for Status */}
