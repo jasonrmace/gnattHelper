@@ -26,7 +26,7 @@ function App() {
             <MainNavbar activeTab={activeTab} setActiveTab={setActiveTab} />
             <Container className="p-3">
 
-                {activeTab === "home" && <ProjectList />}
+                {activeTab === "ProjectList" && <ProjectList />}
                 {activeTab === "AddProject" && <CreateProject />}
                 
                 {/* Version Footer */}
