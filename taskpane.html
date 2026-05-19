@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <title>Project Manager</title>
+    <!-- Office.js: The Bridge between Web and Excel -->
+    <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+    <!-- Tailwind CSS for instant styling (via CDN) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-4">
+
+    <!-- THE UI -->
+    <div class="bg-white p-6 rounded-lg shadow-md">
+        <h2 class="text-xl font-bold mb-4 text-gray-700">New Project</h2>
+        
+        <label class="block text-sm font-medium text-gray-600 mb-1">Project Name</label>
+        <input type="text" id="projectName" class="w-full p-2 border border-gray-300 rounded mb-4 focus:outline-none focus:border-blue-500" placeholder="e.g. Omega Launch">
+
+        <button id="runButton" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded transition duration-200">
+            Create Project
+        </button>
+
+        <!-- Status / Error Messages -->
+        <div id="message" class="mt-4 text-sm text-center text-gray-500"></div>
+    </div>
+
+    <!-- THE LOGIC LINK -->
+    <script src="taskpane.js"></script>
+</body>
+</html>
