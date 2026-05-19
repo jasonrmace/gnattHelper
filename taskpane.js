@@ -5,7 +5,7 @@ Office.onReady((info) => {
 });
 
 async function createNewProject() {
-    console.log("Version 3.0 - Entire Row Copy"); // Look for this in the console
+    console.log("Version 4.0 - Workbook Scope Fix");
     const msg = document.getElementById("message");
     const nameInput = document.getElementById("projectName");
     
@@ -19,11 +19,14 @@ async function createNewProject() {
         await Excel.run(async (context) => {
             const sheet = context.workbook.worksheets.getItem("GanttChart");
 
-            // 1. IDENTIFY TEMPLATE ROW
-            // We get the named range, then expand it to the ENTIRE ROW (A:XFD)
-            // This ensures we grab the Formula in Col A and Formats in Col B.
-            const namedRange = sheet.names.getItem("Level1Task").getRange();
-            const sourceRow = namedRange.getEntireRow();
+            // 1. FIX: LOOK IN WORKBOOK NAMES (Not Sheet Names)
+            // This finds "Level1Task" even if it is scoped globally.
+            const namedItem = context.workbook.names.getItem("Level1Task");
+            
+            // Get the range and extend it to the ENTIRE ROW (A:XFD)
+            // This captures your formula in Col A and formats in Col B
+            const sourceRange = namedItem.getRange();
+            const sourceRow = sourceRange.getEntireRow();
 
             // 2. FIND FOOTER POSITION
             const footerRange = sheet.getRange("A:A").find("DO NOT DELETE", { completeMatch: false, matchCase: false });
@@ -33,20 +36,17 @@ async function createNewProject() {
             const footerIndex = footerRange.rowIndex;
 
             // 3. INSERT BLANK ROW
-            // We target the footer row and insert "Down". 
-            // The footer moves to footerIndex + 1. The new blank row is at footerIndex.
+            // Push the footer down to make space
             const targetRow = sheet.getRange(`${footerIndex + 1}:${footerIndex + 1}`);
             targetRow.insert(Excel.InsertShiftDirection.down);
 
-            // 4. PASTE TEMPLATE (ALL)
-            // We copy the source row onto the new blank row.
-            // copyFrom without arguments copies Values, Formulas, and Formats.
+            // 4. PASTE TEMPLATE
+            // Target the new blank row and copy everything from the source
             const newRow = sheet.getRange(`${footerIndex + 1}:${footerIndex + 1}`);
             newRow.copyFrom(sourceRow);
 
             // 5. UPDATE NAME ONLY
-            // We ONLY touch Column B (Index 1). 
-            // Column A is left alone, so the copied formula remains valid.
+            // We update Column B (Index 1). Column A is left untouched (keeping the formula).
             const cellName = sheet.getCell(footerIndex, 1);
             cellName.values = [[nameInput.value]];
 
@@ -58,7 +58,12 @@ async function createNewProject() {
         });
     } catch (error) {
         console.error(error);
-        msg.innerText = "Error: " + error.message;
+        // Improved Error Message
+        if (error.code === "ItemNotFound") {
+             msg.innerText = "Error: Named Range 'Level1Task' or Sheet 'GanttChart' not found.";
+        } else {
+             msg.innerText = "Error: " + error.message;
+        }
         msg.className = "mt-4 text-sm text-center text-red-500";
     }
 }
