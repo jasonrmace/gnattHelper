@@ -5,7 +5,6 @@ Office.onReady((info) => {
 });
 
 async function createNewProject() {
-    console.log("Version 4.0 - Workbook Scope Fix");
     const msg = document.getElementById("message");
     const nameInput = document.getElementById("projectName");
     
@@ -18,52 +17,63 @@ async function createNewProject() {
     try {
         await Excel.run(async (context) => {
             const sheet = context.workbook.worksheets.getItem("GanttChart");
+            let sourceRow;
+            let sourceRowIndex_Debug;
 
-            // 1. FIX: LOOK IN WORKBOOK NAMES (Not Sheet Names)
-            // This finds "Level1Task" even if it is scoped globally.
-            const namedItem = context.workbook.names.getItem("Level1Task");
-            
-            // Get the range and extend it to the ENTIRE ROW (A:XFD)
-            // This captures your formula in Col A and formats in Col B
-            const sourceRange = namedItem.getRange();
-            const sourceRow = sourceRange.getEntireRow();
+            // --- STEP 1: FIND THE TEMPLATE (Dual-Check) ---
+            // We try to find "Level1Task" on the Sheet first.
+            try {
+                const sheetName = sheet.names.getItem("Level1Task");
+                sourceRow = sheetName.getRange().getEntireRow();
+                sourceRow.load("rowIndex");
+                await context.sync();
+            } catch (e) {
+                // If Sheet-Level fails, try Workbook-Level
+                try {
+                    const wbName = context.workbook.names.getItem("Level1Task");
+                    sourceRow = wbName.getRange().getEntireRow();
+                    sourceRow.load("rowIndex");
+                    await context.sync();
+                } catch (e2) {
+                    throw new Error("Could not find Named Range 'Level1Task' on Sheet OR Workbook.");
+                }
+            }
 
-            // 2. FIND FOOTER POSITION
+            sourceRowIndex_Debug = sourceRow.rowIndex + 1; // +1 for human readability
+
+            // --- STEP 2: FIND INSERTION POINT ---
             const footerRange = sheet.getRange("A:A").find("DO NOT DELETE", { completeMatch: false, matchCase: false });
             footerRange.load("rowIndex");
             await context.sync();
             
             const footerIndex = footerRange.rowIndex;
 
-            // 3. INSERT BLANK ROW
-            // Push the footer down to make space
+            // --- STEP 3: INSERT & COPY ---
+            // Create the blank space
             const targetRow = sheet.getRange(`${footerIndex + 1}:${footerIndex + 1}`);
             targetRow.insert(Excel.InsertShiftDirection.down);
-
-            // 4. PASTE TEMPLATE
-            // Target the new blank row and copy everything from the source
+            
+            // Retarget the new blank row
             const newRow = sheet.getRange(`${footerIndex + 1}:${footerIndex + 1}`);
-            newRow.copyFrom(sourceRow);
 
-            // 5. UPDATE NAME ONLY
-            // We update Column B (Index 1). Column A is left untouched (keeping the formula).
+            // FORCE COPY ALL (Formulas, Formats, Values, Validation)
+            newRow.copyFrom(sourceRow, Excel.RangeCopyType.all);
+
+            // --- STEP 4: UPDATE NAME ---
+            // We ONLY touch Column B (Index 1). 
+            // Column A is left strictly alone to preserve the formula copied from sourceRow.
             const cellName = sheet.getCell(footerIndex, 1);
             cellName.values = [[nameInput.value]];
 
             await context.sync();
             
-            msg.innerText = "Success! Project created.";
+            msg.innerText = `Success! Copied template from Row ${sourceRowIndex_Debug}.`;
             msg.className = "mt-4 text-sm text-center text-green-600";
             nameInput.value = "";
         });
     } catch (error) {
         console.error(error);
-        // Improved Error Message
-        if (error.code === "ItemNotFound") {
-             msg.innerText = "Error: Named Range 'Level1Task' or Sheet 'GanttChart' not found.";
-        } else {
-             msg.innerText = "Error: " + error.message;
-        }
+        msg.innerText = "Error: " + error.message;
         msg.className = "mt-4 text-sm text-center text-red-500";
     }
 }
