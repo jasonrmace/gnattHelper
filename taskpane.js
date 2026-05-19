@@ -4,6 +4,7 @@ const { Container } = ReactBootstrap;
 
 const MainNavbar = window.MainNavbar;
 const CreateProject = window.CreateProject;
+const ProjectList = window.ProjectList;
 
 function App() {
     // --- STATE ---
@@ -25,7 +26,7 @@ function App() {
             <MainNavbar activeTab={activeTab} setActiveTab={setActiveTab} />
             <Container className="p-3">
 
-                {activeTab === "home" && <>HOME TAB</>}
+                {activeTab === "home" && <ProjectList />}
                 {activeTab === "AddProject" && <CreateProject />}
                 
                 {/* Version Footer */}
