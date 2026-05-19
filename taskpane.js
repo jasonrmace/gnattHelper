@@ -7,7 +7,7 @@ const CreateProject = window.CreateProject;
 
 function App() {
     // --- STATE ---
-    const [version] = useState("React-Bootstrap v3.0");
+    const [version] = useState("React-Bootstrap v3.1");
 
     // --- INITIALIZATION ---
     useEffect(() => {
