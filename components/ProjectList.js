@@ -112,32 +112,7 @@ const ProjectList = () => {
 
     // --- 3. UI RENDER ---
     return (
-        <Container className="p-3">
-            
-            <div className="bg-light p-3 rounded mb-4 border">
-                <Form.Group className="mb-2">
-                    <Form.Label className="fw-bold small text-uppercase text-muted">Create New Project</Form.Label>
-                    <Form.Control 
-                        size="sm"
-                        type="text" 
-                        placeholder="Project Name..." 
-                        value={projectName}
-                        onChange={(e) => setProjectName(e.target.value)}
-                        disabled={isCreating}
-                    />
-                </Form.Group>
-                <Button 
-                    variant="primary" 
-                    size="sm" 
-                    className="w-100" 
-                    onClick={handleCreate} 
-                    disabled={isCreating || !projectName}
-                >
-                    {isCreating ? "Working..." : "Add Project"}
-                </Button>
-                {status.msg && <div className={`text-${status.variant} small mt-2 fw-bold text-center`}>{status.msg}</div>}
-            </div>
-
+        <>
             <div className="d-flex justify-content-between align-items-center mb-2">
                 <h6 className="m-0 fw-bold text-primary">Active Projects ({projects.length})</h6>
                 <Button variant="link" size="sm" className="text-decoration-none p-0" onClick={fetchProjects}>
@@ -146,7 +121,7 @@ const ProjectList = () => {
             </div>
 
             {projects.length === 0 && !isFetching && (
-                <div className="text-center text-muted small mt-4">No projects found starting at Row 8.</div>
+                <div className="text-center text-muted small mt-4">No projects found.</div>
             )}
 
             <div style={{ maxHeight: "400px", overflowY: "auto" }}>
@@ -176,8 +151,7 @@ const ProjectList = () => {
                     </Card>
                 ))}
             </div>
-
-        </Container>
+        </>
     );
 };
 
