@@ -14,7 +14,6 @@ const ProjectList = ({ refreshTrigger }) => {
       await Excel.run(async (context) => {
         // 1. Fetch Team Mapping Table First
         const teamSheet = context.workbook.worksheets.getItem("Team");
-        // Get the used range of the Team sheet (adjust range if you have a specific table layout)
         const teamRange = teamSheet.getUsedRange();
         teamRange.load("text");
 
@@ -25,18 +24,19 @@ const ProjectList = ({ refreshTrigger }) => {
         
         await context.sync();
 
-        // 3. Build Team Lookup Map (Key: Current Lead Value -> Value: "First Last")
+        // 3. Build Team Lookup Map
         const teamMap = {};
         const teamRows = teamRange.text;
         
-        // Skip header row (index 0) if your Team sheet has headers
+        // Skip header row (index 0). 
+        // Col A (index 0) = First Name, Col B (index 1) = Last Name
         for (let i = 1; i < teamRows.length; i++) {
-          const lookupKey = teamRows[i][0]?.trim(); // e.g., ShortName, ID, or First Name
-          const firstName = teamRows[i][1]?.trim() || ""; // Col B
-          const lastName = teamRows[i][2]?.trim() || "";  // Col C
+          const firstName = teamRows[i]?.[0]?.trim() || ""; 
+          const lastName = teamRows[i]?.[1]?.trim() || "";  
           
-          if (lookupKey) {
-            teamMap[lookupKey] = `${firstName} ${lastName}`.trim();
+          if (firstName) {
+            // Key is First Name -> Value is "First Last"
+            teamMap[firstName.toLowerCase()] = `${firstName} ${lastName}`.trim();
           }
         }
 
@@ -65,9 +65,9 @@ const ProjectList = ({ refreshTrigger }) => {
             return !isNaN(id) && Number.isInteger(id);
           })
           .map((row) => {
-            const rawLead = row[2]?.trim();
-            // Cross-reference with the team map, fallback to raw string if not found
-            const fullLeadName = teamMap[rawLead] || rawLead;
+            const rawLead = row[2]?.trim() || "";
+            // Look up using lowercase to prevent matching errors due to accidental capitalization differences
+            const fullLeadName = teamMap[rawLead.toLowerCase()] || rawLead;
 
             return {
               id: row[0],       // Col A
