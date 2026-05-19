@@ -2,6 +2,9 @@
 const { useState, useEffect } = React;
 const { Container } = ReactBootstrap;
 
+import MainNavbar from "./components/MainNavbar";
+import CreateProject from "./components/CreateProject";
+
 function App() {
     // --- STATE ---
     const [version] = useState("React-Bootstrap v3.0");
@@ -18,6 +21,8 @@ function App() {
     // --- THE UI (Using React-Bootstrap Components) ---
     return (
         <Container className="p-3">
+            
+            <MainNavbar />
             
             <div className="border-bottom border-primary pb-2 mb-3">
                 <h5 className="text-primary fw-bold m-0">Gantt Manager</h5>
