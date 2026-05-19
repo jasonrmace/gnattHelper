@@ -3,8 +3,10 @@ const { Container, Nav, Navbar, NavDropdown } = ReactBootstrap;
 const MainNavbar = () => {
     return (
     <Navbar expand="lg" className="bg-body-tertiary">
-      <Container>
-        <Navbar.Brand href="#home">React-Bootstrap</Navbar.Brand>
+      {/* <Container> */}
+        <Navbar.Brand href="#home">
+            <img src="https://barbizon.com/wp-content/uploads/2022/12/barbizon-logo-22.svg" srcset="https://barbizon.com/wp-content/uploads/2022/12/barbizon-logo-22.svg 1x,https://barbizon.com/wp-content/uploads/2022/12/barbizon-logo-22.svg 2x,https://barbizon.com/wp-content/uploads/2022/12/barbizon-logo-22.svg 3x" alt="Barbizon Lighting Company" style="width: 132px; margin-left: -164px;" class="tgp-exclude small" />
+        </Navbar.Brand>
         <Navbar.Toggle aria-controls="basic-navbar-nav" />
         <Navbar.Collapse id="basic-navbar-nav">
           <Nav className="me-auto">
@@ -23,7 +25,7 @@ const MainNavbar = () => {
             </NavDropdown>
           </Nav>
         </Navbar.Collapse>
-      </Container>
+      {/* </Container> */}
     </Navbar>
   );
 }
