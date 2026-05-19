@@ -90,7 +90,7 @@ const ProjectList = ({ refreshTrigger }) => {
                                     <Badge bg="primary" className="me-2">#{p.id}</Badge>
                                     <span className="fw-bold text-dark">{p.name}</span>
                                 </div>
-                                <Badge bg={p.percent === "100%" ? "success" : "info"} pill>
+                                <Badge bg={p.percent === "100%" ? "success" : p.percent === "0%" ? "danger" : "warning"} pill>
                                     {p.percent || "0%"}
                                 </Badge>
                             </div>
@@ -100,8 +100,22 @@ const ProjectList = ({ refreshTrigger }) => {
                                     <span>👤 {p.lead || "Unassigned"}</span>
                                 </div>
                                 <div className="d-flex justify-content-between border-top pt-1 mt-1">
-                                    <span>📅 {p.start}</span>
-                                    <span>➔ {p.end}</span>
+                                    {p.start === "TBD" &&
+                                        <>
+                                            <span>📅 {p.start}</span>
+                                        </>
+                                    }
+                                    {p.start === "" &&
+                                        <span>📅 TBD</span>
+                                    }
+                                    {p.start !== "TBD" && p.start !== "" &&
+                                        <>
+                                            <span>📅 {p.start}</span>
+                                            <span> ➔ </span>
+                                            <span>{p.end}</span>
+                                        </>
+                                    }
+                                    
                                 </div>
                             </div>
                         </Card.Body>
