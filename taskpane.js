@@ -18,55 +18,50 @@ async function createNewProject() {
         await Excel.run(async (context) => {
             const sheet = context.workbook.worksheets.getItem("GanttChart");
 
-            // 1. GET THE TEMPLATE (The Style Source)
-            // We assume "Level1Task" is a Named Range in Excel
-            const templateRange = sheet.names.getItem("Level1Task").getRange();
+            // 1. LOCATE TEMPLATE ROW
+            // We find the row index of "Level1Task"
+            const namedRange = sheet.names.getItem("Level1Task").getRange();
+            namedRange.load("rowIndex");
+            await context.sync();
 
-            // 2. Find Footer "DO NOT DELETE"
+            // Define the Source Row (The entire row A:XFD)
+            const sourceRowIndex = namedRange.rowIndex;
+            const sourceRow = sheet.getRange(`${sourceRowIndex + 1}:${sourceRowIndex + 1}`);
+
+            // 2. FIND FOOTER
             const footerRange = sheet.getRange("A:A").find("DO NOT DELETE", { completeMatch: false, matchCase: false });
             footerRange.load("rowIndex");
-            await context.sync(); // Sync needed to read the Row Index
-
-            // 3. Calculate New ID
+            await context.sync();
+            
             const footerRowIndex = footerRange.rowIndex;
-            const lastIdCell = sheet.getCell(footerRowIndex - 1, 0);
-            lastIdCell.load("values");
-            await context.sync(); // Sync needed to read the ID
-            
-            let newID = 1;
-            const lastVal = lastIdCell.values[0][0];
-            if (!isNaN(lastVal) && lastVal !== "") newID = parseInt(lastVal) + 1;
 
-            // 4. Insert the New Row
-            // We grab the row exactly where the footer is, and push the footer down.
-            const newRowRange = sheet.getRange(`A${footerRowIndex + 1}:XFD${footerRowIndex + 1}`);
-            newRowRange.insert(Excel.InsertShiftDirection.down);
+            // 3. INSERT NEW ROW
+            // Insert a blank row at the footer location, pushing footer down
+            const insertRange = sheet.getRange(`${footerRowIndex + 1}:${footerRowIndex + 1}`);
+            insertRange.insert(Excel.InsertShiftDirection.down);
 
-            // 5. APPLY FORMATTING (The Fix)
+            // 4. COPY EVERYTHING (Formulas + Formats)
             // We target the newly created blank row
-            const insertedRow = sheet.getRange(`A${footerRowIndex + 1}:XFD${footerRowIndex + 1}`);
+            const newRow = sheet.getRange(`${footerRowIndex + 1}:${footerRowIndex + 1}`);
             
-            // This command copies ONLY the formats (colors, fonts, borders) from Level1Task
-            insertedRow.copyFrom(templateRange, Excel.RangeCopyType.formats);
+            // CRITICAL CHANGE: No second argument implies "Copy All" (Formulas, Formats, Values)
+            newRow.copyFrom(sourceRow);
 
-            // 6. Write Data (ID and Name)
-            const cellId = sheet.getCell(footerRowIndex, 0);
-            const cellName = sheet.getCell(footerRowIndex, 1);
-            
-            cellId.values = [[newID]];
+            // 5. UPDATE ONLY THE NAME (Column B)
+            // We leave Column A alone so the copied formula does its work.
+            const cellName = sheet.getCell(footerRowIndex, 1); // Index 1 = Column B
             cellName.values = [[nameInput.value]];
 
             await context.sync();
             
-            msg.innerText = `Success! Project ${newID} created.`;
+            msg.innerText = `Success! Project created.`;
             msg.className = "mt-4 text-sm text-center text-green-600";
             nameInput.value = "";
         });
     } catch (error) {
         console.error(error);
-        // Specific error handling if the named range is missing
         if (error.message.includes("Level1Task")) {
-             msg.innerText = "Error: Could not find Named Range 'Level1Task'.";
+             msg.innerText = "Error: Named Range 'Level1Task' not found.";
         } else {
              msg.innerText = "Error: " + error.message;
         }
