@@ -16,48 +16,45 @@ async function createNewProject() {
 
     try {
         await Excel.run(async (context) => {
-            const currentSheet = context.workbook.worksheets.getItem("GanttChart");
+            const sheet = context.workbook.worksheets.getItem("GanttChart");
 
-            // 1. LOCATE THE TRUE TEMPLATE SOURCE
-            // We access the named range via the Workbook to find where it really lives.
-            const namedRange = context.workbook.names.getItem("Level1Task").getRange();
-            
-            // We load the 'worksheet' property to ensure we copy from the correct sheet
-            namedRange.load("worksheet, rowIndex");
+            // 1. LOCATE TEMPLATE ROW
+            // We find the row index of "Level1Task"
+            const namedRange = sheet.names.getItem("Level1Task").getRange();
+            namedRange.load("rowIndex");
             await context.sync();
 
-            // 2. DEFINE SOURCE ROW (FROM THE TEMPLATE SHEET)
-            const sourceSheet = namedRange.worksheet;
+            // Define the Source Row (The entire row A:XFD)
             const sourceRowIndex = namedRange.rowIndex;
-            
-            // Grab the Entire Row (A:XFD) from the SOURCE sheet
-            const sourceRow = sourceSheet.getRange(`${sourceRowIndex + 1}:${sourceRowIndex + 1}`);
+            const sourceRow = sheet.getRange(`${sourceRowIndex + 1}:${sourceRowIndex + 1}`);
 
-            // 3. FIND INSERTION POINT (ON GANTT CHART)
-            const footerRange = currentSheet.getRange("A:A").find("DO NOT DELETE", { completeMatch: false, matchCase: false });
+            // 2. FIND FOOTER
+            const footerRange = sheet.getRange("A:A").find("DO NOT DELETE", { completeMatch: false, matchCase: false });
             footerRange.load("rowIndex");
             await context.sync();
             
             const footerRowIndex = footerRange.rowIndex;
 
-            // 4. INSERT & COPY
-            const targetRow = currentSheet.getRange(`${footerRowIndex + 1}:${footerRowIndex + 1}`);
-            targetRow.insert(Excel.InsertShiftDirection.down);
+            // 3. INSERT NEW ROW
+            // Insert a blank row at the footer location, pushing footer down
+            const insertRange = sheet.getRange(`${footerRowIndex + 1}:${footerRowIndex + 1}`);
+            insertRange.insert(Excel.InsertShiftDirection.down);
+
+            // 4. COPY EVERYTHING (Formulas + Formats)
+            // We target the newly created blank row
+            const newRow = sheet.getRange(`${footerRowIndex + 1}:${footerRowIndex + 1}`);
             
-            // Re-target the new blank row
-            const newRow = currentSheet.getRange(`${footerRowIndex + 1}:${footerRowIndex + 1}`);
-            
-            // Copy everything (Formulas + Formatting) from the Source Sheet
+            // CRITICAL CHANGE: No second argument implies "Copy All" (Formulas, Formats, Values)
             newRow.copyFrom(sourceRow);
 
-            // 5. UPDATE COLUMN B ONLY
-            // We do not touch Column A, so the copied formula stays safe.
-            const cellName = currentSheet.getCell(footerRowIndex, 1); 
+            // 5. UPDATE ONLY THE NAME (Column B)
+            // We leave Column A alone so the copied formula does its work.
+            const cellName = sheet.getCell(footerRowIndex, 1); // Index 1 = Column B
             cellName.values = [[nameInput.value]];
 
             await context.sync();
             
-            msg.innerText = "Success! Project created.";
+            msg.innerText = `Success! Project created.`;
             msg.className = "mt-4 text-sm text-center text-green-600";
             nameInput.value = "";
         });
