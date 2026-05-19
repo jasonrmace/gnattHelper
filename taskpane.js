@@ -8,7 +8,7 @@ const ProjectList = window.ProjectList;
 
 function App() {
     // --- STATE ---
-    const [version] = useState("React-Bootstrap v3.4");
+    const [version] = useState("React-Bootstrap v3.5");
     const [activeTab, setActiveTab] = useState("ProjectList");
 
     // --- INITIALIZATION ---
