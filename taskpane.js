@@ -1,38 +1,37 @@
-/* global React, ReactDOM, Office, Excel */
-
-import CreateProject from "./components/CreateProject";
-
+// 1. UNPACK LIBRARIES (The "No-Import" Way)
 const { useState, useEffect } = React;
+const { Container } = ReactBootstrap;
 
 function App() {
-    // --- STATE MANAGEMENT ---
-    const [version] = useState("React Split v2.0"); // Verify this in the UI
+    // --- STATE ---
+    const [version] = useState("React-Bootstrap v3.0");
 
     // --- INITIALIZATION ---
     useEffect(() => {
         Office.onReady((info) => {
             if (info.host === Office.HostType.Excel) {
-                console.log("Office Ready - React Loaded");
+                console.log("Office Ready");
             }
         });
     }, []);
 
-    // --- THE UI RENDER ---
+    // --- THE UI (Using React-Bootstrap Components) ---
     return (
-        <div className="container-fluid p-3">
+        <Container className="p-3">
             
             <div className="border-bottom border-primary pb-2 mb-3">
                 <h5 className="text-primary fw-bold m-0">Gantt Manager</h5>
-                <small className="text-muted" style={{fontSize: "0.7rem"}}>React Edition</small>
+                <small className="text-muted" style={{fontSize: "0.7rem"}}>RB Edition</small>
             </div>
 
             <CreateProject />
             
             {/* Version Footer */}
-            <div className="fixed-bottom p-1 text-end text-muted pe-3" style={{fontSize: "0.6rem", backgroundColor: "#f1f1f1"}}>
+             <div className="fixed-bottom p-1 text-end text-muted pe-3" style={{fontSize: "0.6rem", backgroundColor: "#f1f1f1"}}>
                 {version}
             </div>
-        </div>
+
+        </Container>
     );
 }
 

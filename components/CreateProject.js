@@ -1,4 +1,5 @@
-import { useState } from "react";
+const { useState } = React;
+const { Button, Form, Alert, Spinner } = ReactBootstrap;
 
 const CreateProject = () => {
 
@@ -7,69 +8,55 @@ const CreateProject = () => {
     const [isLoading, setIsLoading] = useState(false);
 
     // --- CORE LOGIC (The Safe Search + Copy Row) ---
-    const handleCreate = async () => {
+   const handleCreate = async () => {
         if (!projectName) {
-            setStatus({ msg: "Please enter a project name.", type: "text-danger" });
+            setStatus({ msg: "Please enter a project name.", variant: "danger" });
             return;
         }
 
         setIsLoading(true);
-        setStatus({ msg: "Processing...", type: "text-primary" });
+        setStatus({ msg: "Processing...", variant: "primary" });
 
         try {
             await Excel.run(async (context) => {
                 const sheet = context.workbook.worksheets.getItem("GanttChart");
 
-                // 1. Safe Search for Template (Sheet -> Workbook)
+                // Safe Search
                 let namedItem = sheet.names.getItemOrNullObject("Level1Task");
                 await context.sync();
-
                 if (namedItem.isNullObject) {
                     namedItem = context.workbook.names.getItemOrNullObject("Level1Task");
                     await context.sync();
                 }
+                if (namedItem.isNullObject) throw new Error("Named Range 'Level1Task' not found.");
 
-                if (namedItem.isNullObject) {
-                    throw new Error("Named Range 'Level1Task' not found. Check Name Manager.");
-                }
-
-                // 2. Get Source Row (Entire Row for formatting safety)
                 const sourceRow = namedItem.getRange().getEntireRow();
-                sourceRow.load("rowIndex"); 
-                await context.sync();
-
-                // 3. Find Footer
+                sourceRow.load("rowIndex");
+                
                 const footerRange = sheet.getRange("A:A").find("DO NOT DELETE", { completeMatch: false, matchCase: false });
                 footerRange.load("rowIndex");
                 await context.sync();
                 
                 const footerIndex = footerRange.rowIndex;
 
-                // 4. Insert & Copy
-                // Insert Down
-                const targetRow = sheet.getRange(`${footerIndex + 1}:${footerIndex + 1}`);
-                targetRow.insert(Excel.InsertShiftDirection.down);
-                
-                // Copy All (Formulas, Formats, Validation)
-                const newRow = sheet.getRange(`${footerIndex + 1}:${footerIndex + 1}`);
-                newRow.copyFrom(sourceRow, Excel.RangeCopyType.all);
+                // Insert & Copy
+                sheet.getRange(`${footerIndex + 1}:${footerIndex + 1}`).insert(Excel.InsertShiftDirection.down);
+                sheet.getRange(`${footerIndex + 1}:${footerIndex + 1}`).copyFrom(sourceRow, Excel.RangeCopyType.all);
 
-                // 5. Update Name (Column B only)
-                const cellName = sheet.getCell(footerIndex, 1);
-                cellName.values = [[projectName]];
+                // Update Name
+                sheet.getCell(footerIndex, 1).values = [[projectName]];
 
                 await context.sync();
                 
-                // Success Feedback
                 setStatus({ 
-                    msg: `Success! Added '${projectName}' (from Row ${sourceRow.rowIndex + 1}).`, 
-                    type: "text-success" 
+                    msg: `Success! Created '${projectName}'.`, 
+                    variant: "success" 
                 });
-                setProjectName(""); // Clear input
+                setProjectName("");
             });
         } catch (error) {
             console.error(error);
-            setStatus({ msg: "Error: " + error.message, type: "text-danger" });
+            setStatus({ msg: error.message, variant: "danger" });
         } finally {
             setIsLoading(false);
         }
@@ -77,36 +64,36 @@ const CreateProject = () => {
 
     return(
         <>
-            <div className="mb-3">
-                <label className="form-label fw-bold small text-uppercase">New Project Name</label>
-                <input 
+            <Form.Group className="mb-3">
+                <Form.Label className="fw-bold small text-uppercase">New Project Name</Form.Label>
+                <Form.Control 
                     type="text" 
-                    className="form-control" 
-                    placeholder="Enter name..."
+                    placeholder="Enter name..." 
                     value={projectName}
                     onChange={(e) => setProjectName(e.target.value)}
                     disabled={isLoading}
                 />
-            </div>
+            </Form.Group>
 
             <div className="d-grid gap-2">
-                <button 
-                    className="btn btn-primary" 
-                    onClick={handleCreate}
+                <Button 
+                    variant="primary" 
+                    onClick={handleCreate} 
                     disabled={isLoading}
                 >
                     {isLoading ? (
-                        <span><span className="spinner-border spinner-border-sm me-2"></span>Working...</span>
-                    ) : (
-                        "Create Project"
-                    )}
-                </button>
+                        <>
+                            <Spinner as="span" animation="border" size="sm" role="status" aria-hidden="true" className="me-2" />
+                            Working...
+                        </>
+                    ) : "Create Project"}
+                </Button>
             </div>
 
-            {/* Status Message Area */}
-            <div className={`mt-3 text-center small fw-bold ${status.type}`}>
+            {/* Alert Component for Status */}
+            <Alert variant={status.variant} className="mt-3 text-center small py-2 fw-bold">
                 {status.msg}
-            </div>
+            </Alert>
         </>
     )
 }
