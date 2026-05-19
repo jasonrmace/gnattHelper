@@ -28,4 +28,4 @@ const MainNavbar = () => {
   );
 }
 
-export default MainNavbar;
+window.MainNavbar = MainNavbar;

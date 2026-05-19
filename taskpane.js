@@ -2,8 +2,8 @@
 const { useState, useEffect } = React;
 const { Container } = ReactBootstrap;
 
-import MainNavbar from "./components/MainNavbar";
-import CreateProject from "./components/CreateProject";
+const MainNavbar = window.MainNavbar;
+const CreateProject = window.CreateProject;
 
 function App() {
     // --- STATE ---

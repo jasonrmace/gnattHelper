@@ -98,5 +98,5 @@ const CreateProject = () => {
     )
 }
 
-export default CreateProject;
+window.CreateProject = CreateProject;
     
