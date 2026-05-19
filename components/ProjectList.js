@@ -81,7 +81,7 @@ const ProjectList = ({ refreshTrigger }) => {
                 <div className="text-center text-muted small mt-2">No projects found.</div>
             )}
 
-            <div style={{ maxHeight: "calc(100vh - 50px - 16px - 24px - 23px - 8px - 15px - 4px)", overflowY: "auto" }}>
+            <div style={{ maxHeight: "calc(100vh - 180px)", overflowY: "auto" }}>
                 {projects.map((p, index) => (
                     <Card key={index} className="mb-2 shadow-sm border-0">
                         <Card.Body className="p-2">
