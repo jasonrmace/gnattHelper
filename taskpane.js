@@ -9,7 +9,7 @@ const ProjectList = window.ProjectList;
 function App() {
     // --- STATE ---
     const [version] = useState("React-Bootstrap v3.3");
-    const [activeTab, setActiveTab] = useState("home");
+    const [activeTab, setActiveTab] = useState("ProjectList");
 
     // --- INITIALIZATION ---
     useEffect(() => {
