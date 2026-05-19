@@ -16,52 +16,55 @@ async function createNewProject() {
 
     try {
         await Excel.run(async (context) => {
-            const sheet = context.workbook.worksheets.getItem("GanttChart");
+            const currentSheet = context.workbook.worksheets.getItem("GanttChart");
 
-            // 1. GET THE TEMPLATE (Simple Sheet-Level Fetch)
-            const templateRange = sheet.names.getItem("Level1Task").getRange();
+            // 1. LOCATE THE TRUE TEMPLATE SOURCE
+            // We access the named range via the Workbook to find where it really lives.
+            const namedRange = context.workbook.names.getItem("Level1Task").getRange();
+            
+            // We load the 'worksheet' property to ensure we copy from the correct sheet
+            namedRange.load("worksheet, rowIndex");
+            await context.sync();
 
-            // 2. Find Footer "DO NOT DELETE"
-            const footerRange = sheet.getRange("A:A").find("DO NOT DELETE", { completeMatch: false, matchCase: false });
+            // 2. DEFINE SOURCE ROW (FROM THE TEMPLATE SHEET)
+            const sourceSheet = namedRange.worksheet;
+            const sourceRowIndex = namedRange.rowIndex;
+            
+            // Grab the Entire Row (A:XFD) from the SOURCE sheet
+            const sourceRow = sourceSheet.getRange(`${sourceRowIndex + 1}:${sourceRowIndex + 1}`);
+
+            // 3. FIND INSERTION POINT (ON GANTT CHART)
+            const footerRange = currentSheet.getRange("A:A").find("DO NOT DELETE", { completeMatch: false, matchCase: false });
             footerRange.load("rowIndex");
-            await context.sync(); // Sync to get row index
-
-            // 3. Calculate New ID
+            await context.sync();
+            
             const footerRowIndex = footerRange.rowIndex;
-            const lastIdCell = sheet.getCell(footerRowIndex - 1, 0);
-            lastIdCell.load("values");
-            await context.sync(); 
+
+            // 4. INSERT & COPY
+            const targetRow = currentSheet.getRange(`${footerRowIndex + 1}:${footerRowIndex + 1}`);
+            targetRow.insert(Excel.InsertShiftDirection.down);
             
-            let newID = 1;
-            const lastVal = lastIdCell.values[0][0];
-            if (!isNaN(lastVal) && lastVal !== "") newID = parseInt(lastVal) + 1;
-
-            // 4. Insert the New Row
-            const newRowRange = sheet.getRange(`A${footerRowIndex + 1}:XFD${footerRowIndex + 1}`);
-            newRowRange.insert(Excel.InsertShiftDirection.down);
-
-            // 5. APPLY FORMATTING
-            // This copies the formats from the template to the new blank row
-            const insertedRow = sheet.getRange(`A${footerRowIndex + 1}:XFD${footerRowIndex + 1}`);
-            insertedRow.copyFrom(templateRange, Excel.RangeCopyType.formats);
-
-            // 6. Write Data (ID and Name)
-            const cellId = sheet.getCell(footerRowIndex, 0);
-            const cellName = sheet.getCell(footerRowIndex, 1);
+            // Re-target the new blank row
+            const newRow = currentSheet.getRange(`${footerRowIndex + 1}:${footerRowIndex + 1}`);
             
-            cellId.values = [[newID]];
+            // Copy everything (Formulas + Formatting) from the Source Sheet
+            newRow.copyFrom(sourceRow);
+
+            // 5. UPDATE COLUMN B ONLY
+            // We do not touch Column A, so the copied formula stays safe.
+            const cellName = currentSheet.getCell(footerRowIndex, 1); 
             cellName.values = [[nameInput.value]];
 
             await context.sync();
             
-            msg.innerText = `Success! Project ${newID} created.`;
+            msg.innerText = "Success! Project created.";
             msg.className = "mt-4 text-sm text-center text-green-600";
             nameInput.value = "";
         });
     } catch (error) {
         console.error(error);
         if (error.message.includes("Level1Task")) {
-             msg.innerText = "Error: Named Range 'Level1Task' not found on this sheet.";
+             msg.innerText = "Error: Named Range 'Level1Task' not found.";
         } else {
              msg.innerText = "Error: " + error.message;
         }
