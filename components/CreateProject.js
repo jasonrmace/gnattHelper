@@ -1,5 +1,5 @@
 const { useState } = React;
-const { Button, Form, Alert, Spinner } = ReactBootstrap;
+const { Button, Form,  Spinner } = ReactBootstrap;
 
 const CreateProject = () => {
 
@@ -92,11 +92,6 @@ const CreateProject = () => {
                 </Button>
                 {status.msg && <div className={`text-${status.variant} small mt-2 fw-bold text-center`}>{status.msg}</div>}
             </div>
-
-            {/* Alert Component for Status */}
-            <Alert variant={status.variant} className="mt-3 text-center small py-2 fw-bold">
-                {status.msg}
-            </Alert>
         </>
     )
 }
