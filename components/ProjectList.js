@@ -26,12 +26,19 @@ const ProjectList = ({ refreshTrigger }) => {
         return () => window.removeEventListener('resize', calculateHeight);
     }, []);
 
-    // --- 2. EXCEL ACTIONS ---
+    // --- 2. EXCEL ACTIONS (Updated) ---
     const handleJump = async (rowIndex) => {
         try {
             await Excel.run(async (context) => {
                 const sheet = context.workbook.worksheets.getItem("GanttChart");
-                const range = sheet.getRangeByIndexes(rowIndex, 0, 1, 1);
+                
+                // 1. Force switch to the Gantt sheet (if user is on another tab)
+                sheet.activate();
+
+                // 2. Select the ENTIRE ROW (Makes the jump more visible)
+                // We target the specific row index, starting at col 0
+                const range = sheet.getRangeByIndexes(rowIndex, 0, 1, 1).getEntireRow();
+                
                 range.select();
                 await context.sync();
             });
