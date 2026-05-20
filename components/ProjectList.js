@@ -10,57 +10,58 @@ const ProjectList = ({ refreshTrigger }) => {
     
     // Dynamic Height State
     const listContainerRef = useRef(null);
-    const [listHeight, setListHeight] = useState("500px"); // Default start
+    const [listHeight, setListHeight] = useState("500px");
 
     // --- 1. DYNAMIC HEIGHT CALCULATION ---
     useEffect(() => {
         const calculateHeight = () => {
             if (listContainerRef.current) {
-                // Get distance from top of the viewport to the top of the list
                 const topPosition = listContainerRef.current.getBoundingClientRect().top;
-                // Available space = Window Height - Top Position - Buffer (20px)
                 const availableHeight = window.innerHeight - topPosition - 20;
                 setListHeight(`${availableHeight}px`);
             }
         };
-
-        // Run initially
         calculateHeight();
-
-        // Listen for resize events (triggered by Window OR Navbar animation)
         window.addEventListener('resize', calculateHeight);
-        
         return () => window.removeEventListener('resize', calculateHeight);
     }, []);
 
-    // --- 2. DATA FETCHING ---
+    // --- 2. EXCEL ACTIONS ---
+    const handleJump = async (rowIndex) => {
+        try {
+            await Excel.run(async (context) => {
+                const sheet = context.workbook.worksheets.getItem("GanttChart");
+                const range = sheet.getRangeByIndexes(rowIndex, 0, 1, 1);
+                range.select();
+                await context.sync();
+            });
+        } catch (error) {
+            console.error("Jump Error:", error);
+        }
+    };
+
+    // --- 3. DATA FETCHING ---
     const fetchProjects = async () => {
         setIsFetching(true);
         try {
             await Excel.run(async (context) => {
-                // 1. Fetch Team Mapping
                 const teamSheet = context.workbook.worksheets.getItem("Team");
                 const teamRange = teamSheet.getUsedRange();
                 teamRange.load("text");
 
-                // 2. Find Footer
                 const sheet = context.workbook.worksheets.getItem("GanttChart");
                 const footerRange = sheet.getRange("A:A").find("DO NOT DELETE", { completeMatch: false, matchCase: false });
                 footerRange.load("rowIndex");
                 await context.sync();
 
-                // 3. Build Map
                 const teamMap = {};
                 const teamRows = teamRange.text;
                 for (let i = 1; i < teamRows.length; i++) {
                     const firstName = teamRows[i]?.[0]?.trim() || "";
                     const lastName = teamRows[i]?.[1]?.trim() || "";
-                    if (firstName) {
-                        teamMap[firstName.toLowerCase()] = `${firstName} ${lastName}`.trim();
-                    }
+                    if (firstName) teamMap[firstName.toLowerCase()] = `${firstName} ${lastName}`.trim();
                 }
 
-                // 4. Range Calc
                 const dataStartIndex = 7; 
                 const footerIndex = footerRange.rowIndex;
                 const rowCount = footerIndex - dataStartIndex;
@@ -70,24 +71,27 @@ const ProjectList = ({ refreshTrigger }) => {
                     return;
                 }
 
-                // 5. Get Data
                 const dataRange = sheet.getRangeByIndexes(dataStartIndex, 0, rowCount, 8);
                 dataRange.load("text"); 
                 await context.sync();
 
-                // 6. Aggregate
-                const allRows = dataRange.text.filter(row => row[1] !== ""); 
+                const rawRows = dataRange.text;
                 const projectsMap = new Map();
 
-                // Pass A: Projects
-                allRows.forEach(row => {
+                rawRows.forEach((row, index) => {
+                    if (!row[1] || row[1] === "") return;
+
                     const id = parseFloat(row[0]);
+                    const currentRowIndex = dataStartIndex + index; 
+
                     if (!isNaN(id) && Number.isInteger(id)) {
+                        // PROJECT
                         const rawLead = row[2]?.trim() || "";
                         const fullLeadName = teamMap[rawLead.toLowerCase()] || rawLead;
 
                         projectsMap.set(id, {
                             id: row[0],
+                            rowIndex: currentRowIndex,
                             name: row[1],
                             lead: fullLeadName,
                             start: row[4],
@@ -96,20 +100,13 @@ const ProjectList = ({ refreshTrigger }) => {
                             totalTasks: 0,
                             completedTasks: 0
                         });
-                    }
-                });
-
-                // Pass B: Tasks
-                allRows.forEach(row => {
-                    const id = parseFloat(row[0]);
-                    if (!isNaN(id) && !Number.isInteger(id)) {
+                    } else if (!isNaN(id) && !Number.isInteger(id)) {
+                        // TASK
                         const parentId = Math.floor(id);
                         if (projectsMap.has(parentId)) {
                             const project = projectsMap.get(parentId);
                             project.totalTasks++;
-                            if (row[7].includes("100%")) {
-                                project.completedTasks++;
-                            }
+                            if (row[7].includes("100%")) project.completedTasks++;
                         }
                     }
                 });
@@ -141,7 +138,6 @@ const ProjectList = ({ refreshTrigger }) => {
                 <div className="text-center text-muted small mt-2">No projects found.</div>
             )}
 
-            {/* DYNAMIC HEIGHT CONTAINER */}
             <div 
                 ref={listContainerRef}
                 style={{ 
@@ -154,31 +150,59 @@ const ProjectList = ({ refreshTrigger }) => {
                     <Card key={index} className="mb-2 shadow-sm border-0">
                         <Card.Body className="p-2">
                             <div className="d-flex justify-content-between align-items-start">
-                                <div>
+                                <div className="d-flex align-items-center" style={{overflow: "hidden"}}>
                                     <Badge bg="primary" className="me-2">#{p.id}</Badge>
-                                    <span className="fw-bold text-dark">{p.name}</span>
+                                    <span className="fw-bold text-dark text-truncate" title={p.name}>
+                                        {p.name}
+                                    </span>
                                 </div>
-                                <Badge bg={p.percent === "100%" ? "success" : p.percent === "0%" ? "danger" : "warning"} pill>
-                                    {p.percent || "0%"}
-                                </Badge>
+                                
+                                {/* STATUS + JUMP BUTTON */}
+                                <div className="d-flex align-items-center flex-shrink-0 ms-2">
+                                    <Badge bg={p.percent === "100%" ? "success" : p.percent === "0%" ? "danger" : "warning"} pill className="me-2">
+                                        {p.percent || "0%"}
+                                    </Badge>
+                                    
+                                    <Button 
+                                        variant="light"
+                                        size="sm" 
+                                        className="text-primary p-1 lh-1" 
+                                        title="Show in Grid"
+                                        onClick={() => handleJump(p.rowIndex)}
+                                    >
+                                        <i className="fas fa-location-arrow"></i>
+                                    </Button>
+                                </div>
                             </div>
                             
                             <div className="mt-2 small text-muted">
+                                
+                                {/* TASKS ROW */}
                                 <div className="d-flex justify-content-between mb-1 text-dark">
-                                    <span>☑️ Tasks: <strong>{p.completedTasks}/{p.totalTasks}</strong> Complete</span>
+                                    <span>
+                                        <i className="fas fa-list-check me-2 text-secondary"></i> 
+                                        Tasks: <strong>{p.completedTasks}/{p.totalTasks}</strong>
+                                    </span>
                                 </div>
 
-                                <div className="d-flex justify-content-between">
-                                    <span>👤 {p.lead || "Unassigned"}</span>
+                                {/* LEAD ROW */}
+                                <div className="d-flex justify-content-between mb-1">
+                                    <span>
+                                        <i className="fas fa-user me-2 text-secondary" style={{width: "14px", textAlign: "center"}}></i> 
+                                        {p.lead || "Unassigned"}
+                                    </span>
                                 </div>
                                 
+                                {/* DATES ROW */}
                                 <div className="d-flex justify-content-between border-top pt-1 mt-1">
-                                    {p.start === "TBD" && <span>📅 {p.start}</span>}
-                                    {p.start === "" && <span>📅 TBD</span>}
+                                    <span className="d-flex align-items-center">
+                                        <i className="fas fa-calendar-days me-2 text-secondary" style={{width: "14px", textAlign: "center"}}></i>
+                                        {p.start === "TBD" || p.start === "" ? "TBD" : p.start}
+                                    </span>
+                                    
                                     {p.start !== "TBD" && p.start !== "" && (
                                         <>
-                                            <span>📅 {p.start}</span>
-                                            <span> ➔ </span>
+                                            <span className="mx-1 text-muted"><i className="fas fa-arrow-right" style={{fontSize: "0.7rem"}}></i></span>
                                             <span>{p.end}</span>
                                         </>
                                     )}
