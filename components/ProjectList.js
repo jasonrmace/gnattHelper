@@ -1,30 +1,55 @@
 /* global React, ReactBootstrap, Excel */
 
-const { useState, useEffect } = React;
+const { useState, useEffect, useRef } = React;
 const { Button, Card, Badge, Spinner } = window.ReactBootstrap || {};
 
 const ProjectList = ({ refreshTrigger }) => {
     // --- STATE ---
     const [projects, setProjects] = useState([]);
     const [isFetching, setIsFetching] = useState(false);
+    
+    // Dynamic Height State
+    const listContainerRef = useRef(null);
+    const [listHeight, setListHeight] = useState("500px"); // Default start
 
-    // --- DATA FETCHING ---
+    // --- 1. DYNAMIC HEIGHT CALCULATION ---
+    useEffect(() => {
+        const calculateHeight = () => {
+            if (listContainerRef.current) {
+                // Get distance from top of the viewport to the top of the list
+                const topPosition = listContainerRef.current.getBoundingClientRect().top;
+                // Available space = Window Height - Top Position - Buffer (20px)
+                const availableHeight = window.innerHeight - topPosition - 20;
+                setListHeight(`${availableHeight}px`);
+            }
+        };
+
+        // Run initially
+        calculateHeight();
+
+        // Listen for resize events (triggered by Window OR Navbar animation)
+        window.addEventListener('resize', calculateHeight);
+        
+        return () => window.removeEventListener('resize', calculateHeight);
+    }, []);
+
+    // --- 2. DATA FETCHING ---
     const fetchProjects = async () => {
         setIsFetching(true);
         try {
             await Excel.run(async (context) => {
-                // 1. Fetch Team Mapping Table First
+                // 1. Fetch Team Mapping
                 const teamSheet = context.workbook.worksheets.getItem("Team");
                 const teamRange = teamSheet.getUsedRange();
                 teamRange.load("text");
 
-                // 2. Find Gantt Chart Footer
+                // 2. Find Footer
                 const sheet = context.workbook.worksheets.getItem("GanttChart");
                 const footerRange = sheet.getRange("A:A").find("DO NOT DELETE", { completeMatch: false, matchCase: false });
                 footerRange.load("rowIndex");
                 await context.sync();
 
-                // 3. Build Team Lookup Map
+                // 3. Build Map
                 const teamMap = {};
                 const teamRows = teamRange.text;
                 for (let i = 1; i < teamRows.length; i++) {
@@ -35,30 +60,29 @@ const ProjectList = ({ refreshTrigger }) => {
                     }
                 }
 
-                // 4. Calculate Gantt Range (Row 8 start)
-                const dataStartIndex = 7;
+                // 4. Range Calc
+                const dataStartIndex = 7; 
                 const footerIndex = footerRange.rowIndex;
                 const rowCount = footerIndex - dataStartIndex;
 
                 if (rowCount <= 0) {
-                    setProjects([]);
+                    setProjects([]); 
                     return;
                 }
 
-                // 5. Get Project Data
+                // 5. Get Data
                 const dataRange = sheet.getRangeByIndexes(dataStartIndex, 0, rowCount, 8);
-                dataRange.load("text");
+                dataRange.load("text"); 
                 await context.sync();
 
-                // 6. AGGREGATE TASKS (New Logic)
-                const allRows = dataRange.text.filter(row => row[1] !== ""); // Skip blank names
+                // 6. Aggregate
+                const allRows = dataRange.text.filter(row => row[1] !== ""); 
                 const projectsMap = new Map();
 
-                // Pass A: Identify Projects (Integers)
+                // Pass A: Projects
                 allRows.forEach(row => {
                     const id = parseFloat(row[0]);
                     if (!isNaN(id) && Number.isInteger(id)) {
-                        // It is a Project
                         const rawLead = row[2]?.trim() || "";
                         const fullLeadName = teamMap[rawLead.toLowerCase()] || rawLead;
 
@@ -69,23 +93,20 @@ const ProjectList = ({ refreshTrigger }) => {
                             start: row[4],
                             end: row[5],
                             percent: row[7],
-                            // Initialize Counters
                             totalTasks: 0,
                             completedTasks: 0
                         });
                     }
                 });
 
-                // Pass B: Count Tasks (Decimals)
+                // Pass B: Tasks
                 allRows.forEach(row => {
                     const id = parseFloat(row[0]);
                     if (!isNaN(id) && !Number.isInteger(id)) {
-                        // It is a Task (e.g. 1.1), find parent (e.g. 1)
                         const parentId = Math.floor(id);
                         if (projectsMap.has(parentId)) {
                             const project = projectsMap.get(parentId);
                             project.totalTasks++;
-                            // Check if task is 100% complete
                             if (row[7].includes("100%")) {
                                 project.completedTasks++;
                             }
@@ -93,7 +114,6 @@ const ProjectList = ({ refreshTrigger }) => {
                     }
                 });
 
-                // Convert Map back to Array for Rendering
                 setProjects(Array.from(projectsMap.values()));
             });
         } catch (error) {
@@ -103,7 +123,6 @@ const ProjectList = ({ refreshTrigger }) => {
         }
     };
 
-    // Auto-refresh when trigger changes
     useEffect(() => {
         fetchProjects();
     }, [refreshTrigger]);
@@ -122,7 +141,15 @@ const ProjectList = ({ refreshTrigger }) => {
                 <div className="text-center text-muted small mt-2">No projects found.</div>
             )}
 
-            <div style={{ maxHeight: "calc(100vh - 180px)", overflowY: "auto" }}>
+            {/* DYNAMIC HEIGHT CONTAINER */}
+            <div 
+                ref={listContainerRef}
+                style={{ 
+                    maxHeight: listHeight, 
+                    overflowY: "auto",
+                    transition: "max-height 0.1s ease-out" 
+                }}
+            >
                 {projects.map((p, index) => (
                     <Card key={index} className="mb-2 shadow-sm border-0">
                         <Card.Body className="p-2">
@@ -137,8 +164,6 @@ const ProjectList = ({ refreshTrigger }) => {
                             </div>
                             
                             <div className="mt-2 small text-muted">
-                                
-                                {/* TASK COUNT ROW */}
                                 <div className="d-flex justify-content-between mb-1 text-dark">
                                     <span>☑️ Tasks: <strong>{p.completedTasks}/{p.totalTasks}</strong> Complete</span>
                                 </div>
@@ -148,11 +173,7 @@ const ProjectList = ({ refreshTrigger }) => {
                                 </div>
                                 
                                 <div className="d-flex justify-content-between border-top pt-1 mt-1">
-                                    {p.start === "TBD" && (
-                                        <>
-                                            <span>📅 {p.start}</span>
-                                        </>
-                                    )}
+                                    {p.start === "TBD" && <span>📅 {p.start}</span>}
                                     {p.start === "" && <span>📅 TBD</span>}
                                     {p.start !== "TBD" && p.start !== "" && (
                                         <>
