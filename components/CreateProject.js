@@ -15,7 +15,7 @@ const CreateProject = () => {
     const [status, setStatus] = useState({ msg: "", variant: "light" });
     const [isLoading, setIsLoading] = useState(false);
 
-    // --- 1. FETCH TEAM MEMBERS ON LOAD ---
+    // --- 1. FETCH TEAM MEMBERS (As Objects) ---
     useEffect(() => {
         const fetchTeam = async () => {
             try {
@@ -27,11 +27,18 @@ const CreateProject = () => {
 
                     const rows = range.text;
                     const members = [];
+                    
                     // Skip header (row 0). Col A=First, Col B=Last
                     for (let i = 1; i < rows.length; i++) {
-                        const first = rows[i][0];
-                        const last = rows[i][1];
-                        if (first) members.push(`${first} ${last}`.trim());
+                        const first = rows[i][0]?.trim(); // Clean extra spaces
+                        const last = rows[i][1]?.trim();
+                        
+                        if (first) {
+                            members.push({
+                                first: first,                 // VALUE (for Excel)
+                                full: `${first} ${last}`      // LABEL (for UI)
+                            });
+                        }
                     }
                     setTeamMembers(members);
                 });
@@ -49,7 +56,6 @@ const CreateProject = () => {
 
     // --- 3. CREATE LOGIC ---
     const handleCreate = async () => {
-        // Validation
         if (!formData.name) {
             setStatus({ msg: "Project Name is required.", variant: "danger" });
             return;
@@ -77,21 +83,19 @@ const CreateProject = () => {
 
                 const sourceRow = namedItem.getRange().getEntireRow();
 
-                // B. Find Footer & Insert Location
+                // B. Find Footer
                 const footerRange = sheet.getRange("A:A").find("DO NOT DELETE", { completeMatch: false, matchCase: false });
                 footerRange.load("rowIndex");
                 await context.sync();
                 
                 const footerIndex = footerRange.rowIndex;
-                const insertRange = sheet.getRange(`${footerIndex + 1}:${footerIndex + 1}`);
 
-                // C. Insert & Copy Template
-                insertRange.insert(Excel.InsertShiftDirection.down);
-                // Re-grab the new row location
+                // C. Insert & Copy
+                sheet.getRange(`${footerIndex + 1}:${footerIndex + 1}`).insert(Excel.InsertShiftDirection.down);
                 const newRow = sheet.getRange(`${footerIndex + 1}:${footerIndex + 1}`);
                 newRow.copyFrom(sourceRow, Excel.RangeCopyType.all);
 
-                // D. Calculate Duration (Days) for Column G
+                // D. Calculate Duration
                 let duration = "";
                 if (formData.startDate && formData.endDate) {
                     const start = new Date(formData.startDate);
@@ -101,38 +105,36 @@ const CreateProject = () => {
                 }
 
                 // E. Write Data
-                // Col B (1) = Name
+                // Name (Col B)
                 sheet.getCell(footerIndex, 1).values = [[formData.name]];
                 
-                // Col C (2) = Lead
+                // Lead (Col C) - DIRECTLY USE FIRST NAME FROM STATE
                 if (formData.lead) {
                     sheet.getCell(footerIndex, 2).values = [[formData.lead]];
                 }
 
-                // Col E (4) = Start Date
+                // Start Date (Col E)
                 if (formData.startDate) {
-                    // Format date for Excel (YYYY-MM-DD usually works best)
                     sheet.getCell(footerIndex, 4).values = [[formData.startDate]];
                 }
 
-                // Col G (6) = Duration (Calculated from End Date)
+                // Duration (Col G)
                 if (duration !== "") {
                     sheet.getCell(footerIndex, 6).values = [[duration]];
                 }
 
-                // F. Activate Sheet & Highlight Row
+                // F. Activate & Select
                 sheet.activate();
                 newRow.select();
 
                 await context.sync();
 
                 setStatus({ msg: "Success!", variant: "success" });
-                
-                // Reset Form
                 setFormData({ name: "", lead: "", startDate: "", endDate: "" });
                 
-                // Trigger Global Refresh (if needed by other components)
-                // window.dispatchEvent(new Event('projectCreated')); 
+                if (window.Home && window.Home.triggerRefresh) {
+                     window.Home.triggerRefresh();
+                }
             });
         } catch (error) {
             console.error(error);
@@ -160,7 +162,7 @@ const CreateProject = () => {
                 />
             </Form.Group>
 
-            {/* PROJECT LEAD */}
+            {/* PROJECT LEAD (Updated Logic) */}
             <Form.Group className="mb-2">
                 <Form.Label className="small fw-bold text-muted">PROJECT LEAD</Form.Label>
                 <Form.Select 
@@ -171,12 +173,15 @@ const CreateProject = () => {
                 >
                     <option value="">Select Lead...</option>
                     {teamMembers.map((member, idx) => (
-                        <option key={idx} value={member}>{member}</option>
+                        // Value = First Name | Text = Full Name
+                        <option key={idx} value={member.first}>
+                            {member.full}
+                        </option>
                     ))}
                 </Form.Select>
             </Form.Group>
 
-            {/* DATES ROW */}
+            {/* DATES */}
             <Row className="g-2 mb-3">
                 <Col xs={6}>
                     <Form.Group>
