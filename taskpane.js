@@ -3,7 +3,7 @@
 // 1. CONFIGURATION
 // Change this to a unique part of your server path (e.g., "SharePoint", "OneDrive", or a specific folder name)
 // If you want to disable this check for testing, leave it as an empty string ""
-const EXPECTED_LOCATION = ""; 
+const EXPECTED_LOCATION = "barbizon-my.sharepoint.com";
 
 // 2. UNPACK LIBRARIES
 const { useState, useEffect } = React;
@@ -16,7 +16,7 @@ const ProjectList = window.ProjectList;
 
 function App() {
     // --- STATE ---
-    const [version] = useState("React-Bootstrap v3.7.0");
+    const [version] = useState("React-Bootstrap v3.7.1");
     const [activeTab, setActiveTab] = useState("ProjectList");
     const [locationWarning, setLocationWarning] = useState(null);
 
