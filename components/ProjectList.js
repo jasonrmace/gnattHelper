@@ -3,11 +3,17 @@
 const { useState, useEffect, useRef } = React;
 const { Button, Card, Badge, Spinner } = window.ReactBootstrap || {};
 
+// IMPORT CHILD COMPONENT
+const ProjectTasks = window.ProjectTasks;
+
 const ProjectList = ({ refreshTrigger }) => {
     // --- STATE ---
     const [projects, setProjects] = useState([]);
     const [isFetching, setIsFetching] = useState(false);
     
+    // VIEW STATE: Controls "List" vs "Detail" view
+    const [selectedProject, setSelectedProject] = useState(null);
+
     // Dynamic Height State
     const listContainerRef = useRef(null);
     const [listHeight, setListHeight] = useState("500px");
@@ -24,27 +30,19 @@ const ProjectList = ({ refreshTrigger }) => {
         calculateHeight();
         window.addEventListener('resize', calculateHeight);
         return () => window.removeEventListener('resize', calculateHeight);
-    }, []);
+    }, [selectedProject]); // Recalculate when view changes
 
-    // --- 2. EXCEL ACTIONS (Updated) ---
+    // --- 2. EXCEL ACTIONS ---
     const handleJump = async (rowIndex) => {
         try {
             await Excel.run(async (context) => {
                 const sheet = context.workbook.worksheets.getItem("GanttChart");
-                
-                // 1. Force switch to the Gantt sheet (if user is on another tab)
                 sheet.activate();
-
-                // 2. Select the ENTIRE ROW (Makes the jump more visible)
-                // We target the specific row index, starting at col 0
                 const range = sheet.getRangeByIndexes(rowIndex, 0, 1, 1).getEntireRow();
-                
                 range.select();
                 await context.sync();
             });
-        } catch (error) {
-            console.error("Jump Error:", error);
-        }
+        } catch (error) { console.error("Jump Error:", error); }
     };
 
     // --- 3. DATA FETCHING ---
@@ -87,15 +85,12 @@ const ProjectList = ({ refreshTrigger }) => {
 
                 rawRows.forEach((row, index) => {
                     if (!row[1] || row[1] === "") return;
-
                     const id = parseFloat(row[0]);
                     const currentRowIndex = dataStartIndex + index; 
 
                     if (!isNaN(id) && Number.isInteger(id)) {
-                        // PROJECT
                         const rawLead = row[2]?.trim() || "";
                         const fullLeadName = teamMap[rawLead.toLowerCase()] || rawLead;
-
                         projectsMap.set(id, {
                             id: row[0],
                             rowIndex: currentRowIndex,
@@ -108,7 +103,6 @@ const ProjectList = ({ refreshTrigger }) => {
                             completedTasks: 0
                         });
                     } else if (!isNaN(id) && !Number.isInteger(id)) {
-                        // TASK
                         const parentId = Math.floor(id);
                         if (projectsMap.has(parentId)) {
                             const project = projectsMap.get(parentId);
@@ -117,21 +111,20 @@ const ProjectList = ({ refreshTrigger }) => {
                         }
                     }
                 });
-
                 setProjects(Array.from(projectsMap.values()));
             });
-        } catch (error) {
-            console.error("Fetch error:", error);
-        } finally {
-            setIsFetching(false);
-        }
+        } catch (error) { console.error(error); } finally { setIsFetching(false); }
     };
 
-    useEffect(() => {
-        fetchProjects();
-    }, [refreshTrigger]);
+    useEffect(() => { fetchProjects(); }, [refreshTrigger]);
 
-    // --- UI RENDER ---
+    // --- VIEW ROUTER ---
+    // If a project is selected, show the Tasks View instead of the List
+    if (selectedProject) {
+        return <ProjectTasks project={selectedProject} onBack={() => setSelectedProject(null)} />;
+    }
+
+    // --- UI RENDER (PROJECT LIST) ---
     return (
         <div className="mt-4">
             <div className="d-flex justify-content-between align-items-center mb-2">
@@ -147,11 +140,7 @@ const ProjectList = ({ refreshTrigger }) => {
 
             <div 
                 ref={listContainerRef}
-                style={{ 
-                    maxHeight: listHeight, 
-                    overflowY: "auto",
-                    transition: "max-height 0.1s ease-out" 
-                }}
+                style={{ maxHeight: listHeight, overflowY: "auto", transition: "max-height 0.1s ease-out" }}
             >
                 {projects.map((p, index) => (
                     <Card key={index} className="mb-2 shadow-sm border-0">
@@ -163,50 +152,41 @@ const ProjectList = ({ refreshTrigger }) => {
                                         {p.name}
                                     </span>
                                 </div>
-                                
-                                {/* STATUS + JUMP BUTTON */}
                                 <div className="d-flex align-items-center flex-shrink-0 ms-2">
                                     <Badge bg={p.percent === "100%" ? "success" : p.percent === "0%" ? "danger" : "warning"} pill className="me-2">
                                         {p.percent || "0%"}
                                     </Badge>
-                                    
-                                    <Button 
-                                        variant="light"
-                                        size="sm" 
-                                        className="text-primary p-1 lh-1" 
-                                        title="Show in Grid"
-                                        onClick={() => handleJump(p.rowIndex)}
-                                    >
+                                    <Button variant="light" size="sm" className="text-primary p-1 lh-1" onClick={() => handleJump(p.rowIndex)}>
                                         <i className="fas fa-location-arrow"></i>
                                     </Button>
                                 </div>
                             </div>
                             
                             <div className="mt-2 small text-muted">
-                                
-                                {/* TASKS ROW */}
-                                <div className="d-flex justify-content-between mb-1 text-dark">
+                                {/* CLICKABLE TASKS ROW */}
+                                <div 
+                                    className="d-flex justify-content-between mb-1 text-dark p-1 rounded" 
+                                    style={{cursor: "pointer", backgroundColor: "#f8f9fa", transition: "background 0.2s"}}
+                                    onClick={() => setSelectedProject(p)}
+                                    onMouseOver={(e) => e.currentTarget.style.background = "#e9ecef"}
+                                    onMouseOut={(e) => e.currentTarget.style.background = "#f8f9fa"}
+                                    title="Click to View Tasks"
+                                >
                                     <span>
-                                        <i className="fas fa-list-check me-2 text-secondary"></i> 
+                                        <i className="fas fa-list-check me-2 text-primary"></i> 
                                         Tasks: <strong>{p.completedTasks}/{p.totalTasks}</strong>
                                     </span>
+                                    <span className="text-primary"><i className="fas fa-chevron-right"></i></span>
                                 </div>
 
-                                {/* LEAD ROW */}
-                                <div className="d-flex justify-content-between mb-1">
-                                    <span>
-                                        <i className="fas fa-user me-2 text-secondary" style={{width: "14px", textAlign: "center"}}></i> 
-                                        {p.lead || "Unassigned"}
-                                    </span>
+                                <div className="d-flex justify-content-between mb-1 px-1">
+                                    <span><i className="fas fa-user me-2 text-secondary" style={{width: "14px", textAlign: "center"}}></i> {p.lead || "Unassigned"}</span>
                                 </div>
-                                
-                                {/* DATES ROW */}
-                                <div className="d-flex justify-content-between border-top pt-1 mt-1">
+                                <div className="d-flex justify-content-between border-top pt-1 mt-1 px-1">
                                     <span className="d-flex align-items-center">
                                         <i className="fas fa-calendar-days me-2 text-secondary" style={{width: "14px", textAlign: "center"}}></i>
                                         {p.start === "TBD" || p.start === "" ? "TBD" : p.start}
                                     </span>
-                                    
                                     {p.start !== "TBD" && p.start !== "" && (
                                         <>
                                             <span className="mx-1 text-muted"><i className="fas fa-arrow-right" style={{fontSize: "0.7rem"}}></i></span>
