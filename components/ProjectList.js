@@ -19,6 +19,7 @@ const ProjectList = ({ refreshTrigger }) => {
     const [listHeight, setListHeight] = useState("500px");
 
     // --- 1. DYNAMIC HEIGHT CALCULATION ---
+    // Runs on load AND when switching views
     useEffect(() => {
         const calculateHeight = () => {
             if (listContainerRef.current) {
@@ -30,7 +31,7 @@ const ProjectList = ({ refreshTrigger }) => {
         calculateHeight();
         window.addEventListener('resize', calculateHeight);
         return () => window.removeEventListener('resize', calculateHeight);
-    }, [selectedProject]); // Recalculate when view changes
+    }, [selectedProject]); 
 
     // --- 2. EXCEL ACTIONS ---
     const handleJump = async (rowIndex) => {
@@ -83,16 +84,18 @@ const ProjectList = ({ refreshTrigger }) => {
                 const rawRows = dataRange.text;
                 const projectsMap = new Map();
 
+                // Aggregate Projects & Tasks
                 rawRows.forEach((row, index) => {
                     if (!row[1] || row[1] === "") return;
                     const id = parseFloat(row[0]);
                     const currentRowIndex = dataStartIndex + index; 
 
                     if (!isNaN(id) && Number.isInteger(id)) {
+                        // IT IS A PROJECT
                         const rawLead = row[2]?.trim() || "";
                         const fullLeadName = teamMap[rawLead.toLowerCase()] || rawLead;
                         projectsMap.set(id, {
-                            id: row[0],
+                            id: row[0], // Keep as string/raw to avoid float issues
                             rowIndex: currentRowIndex,
                             name: row[1],
                             lead: fullLeadName,
@@ -103,6 +106,7 @@ const ProjectList = ({ refreshTrigger }) => {
                             completedTasks: 0
                         });
                     } else if (!isNaN(id) && !Number.isInteger(id)) {
+                        // IT IS A TASK
                         const parentId = Math.floor(id);
                         if (projectsMap.has(parentId)) {
                             const project = projectsMap.get(parentId);
@@ -118,13 +122,18 @@ const ProjectList = ({ refreshTrigger }) => {
 
     useEffect(() => { fetchProjects(); }, [refreshTrigger]);
 
-    // --- VIEW ROUTER ---
-    // If a project is selected, show the Tasks View instead of the List
+    // --- VIEW ROUTER (The Switch) ---
+    // If a project is selected, SHOW TASKS VIEW instead of List
     if (selectedProject) {
-        return <ProjectTasks project={selectedProject} onBack={() => setSelectedProject(null)} />;
+        return (
+            <ProjectTasks 
+                project={selectedProject} 
+                onBack={() => setSelectedProject(null)} 
+            />
+        );
     }
 
-    // --- UI RENDER (PROJECT LIST) ---
+    // --- DEFAULT UI: PROJECT LIST ---
     return (
         <div className="mt-4">
             <div className="d-flex justify-content-between align-items-center mb-2">
@@ -163,20 +172,27 @@ const ProjectList = ({ refreshTrigger }) => {
                             </div>
                             
                             <div className="mt-2 small text-muted">
-                                {/* CLICKABLE TASKS ROW */}
+                                
+                                {/* CLICKABLE TASKS BUTTON */}
                                 <div 
-                                    className="d-flex justify-content-between mb-1 text-dark p-1 rounded" 
-                                    style={{cursor: "pointer", backgroundColor: "#f8f9fa", transition: "background 0.2s"}}
+                                    className="d-flex justify-content-between mb-1 text-dark p-1 rounded border border-light" 
+                                    style={{cursor: "pointer", backgroundColor: "#f8f9fa", transition: "all 0.2s"}}
                                     onClick={() => setSelectedProject(p)}
-                                    onMouseOver={(e) => e.currentTarget.style.background = "#e9ecef"}
-                                    onMouseOut={(e) => e.currentTarget.style.background = "#f8f9fa"}
-                                    title="Click to View Tasks"
+                                    onMouseOver={(e) => {
+                                        e.currentTarget.style.background = "#e2e6ea";
+                                        e.currentTarget.style.borderColor = "#dee2e6";
+                                    }}
+                                    onMouseOut={(e) => {
+                                        e.currentTarget.style.background = "#f8f9fa";
+                                        e.currentTarget.style.borderColor = "#f8f9fa";
+                                    }}
+                                    title="Click to Manage Tasks"
                                 >
-                                    <span>
+                                    <span className="fw-bold" style={{fontSize: "0.9em"}}>
                                         <i className="fas fa-list-check me-2 text-primary"></i> 
-                                        Tasks: <strong>{p.completedTasks}/{p.totalTasks}</strong>
+                                        Tasks: {p.completedTasks}/{p.totalTasks}
                                     </span>
-                                    <span className="text-primary"><i className="fas fa-chevron-right"></i></span>
+                                    <span className="text-primary"><i className="fas fa-chevron-right" style={{fontSize: "0.8em"}}></i></span>
                                 </div>
 
                                 <div className="d-flex justify-content-between mb-1 px-1">
