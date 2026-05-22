@@ -310,8 +310,8 @@ const ProjectTasks = ({ project, onBack }) => {
                         <i className="fas fa-arrow-left"></i>
                     </Button>
                     <div style={{lineHeight: "1.1"}}>
-                        <h6 className="m-0 fw-bold text-primary">Project {project.id}</h6>
-                        <small className="text-muted" style={{fontSize: "0.7rem"}}>Task Manager</small>
+                        <h6 className="m-0 fw-bold text-primary">{project.name}</h6>
+                        <small className="text-muted" style={{fontSize: "0.7rem"}}>Project {project.id} Task Manager</small>
                     </div>
                 </div>
                 <Button variant="primary" size="sm" onClick={openAddModal}>
