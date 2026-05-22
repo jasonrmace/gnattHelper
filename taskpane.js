@@ -14,7 +14,7 @@ const ProjectList = window.ProjectList;
 
 function App() {
     // --- STATE ---
-    const [version] = useState("React-Bootstrap v4.1.1");
+    const [version] = useState("React-Bootstrap v4.1.2");
     const [activeTab, setActiveTab] = useState("ProjectList");
     
     // VALIDATION STATE: Defaults to true, flips to false if check fails
