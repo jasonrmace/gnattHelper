@@ -1,12 +1,17 @@
 /* global Excel */
 
 // ==============================================================================
-// FORMATTING LOGIC ENGINE (Phase 4 Final - FIFO Order)
+// FORMATTING LOGIC ENGINE (Phase 5: Corrected Stack & Filters)
 // Replaces VBA 'GenerateSmartRules'
-// Strategy: 
-// 1. EXECUTION ORDER = VISUAL PRIORITY ORDER (Top to Bottom).
-// 2. Progress Bar & Today Borders go FIRST (Top).
-// 3. PTO & Holidays go LAST (Bottom).
+// 
+// VISUAL STACK (Logic Order):
+// 1. Progress Bar (Grey Overlay) -> Added FIRST
+// 2. Today Borders (Red Outline)
+// 3. Team Colors (Specific Assignees)
+// 4. Generic Blue (Default Task)
+// 5. Parent Row (Grey Row)
+// 6. Holidays (Grey Background)
+// 7. PTO (Grey Background) -> Added LAST
 // ==============================================================================
 
 window.FormattingLogic = {
@@ -38,7 +43,7 @@ window.FormattingLogic = {
             gridRange.conditionalFormats.clearAll();
             namesRange.conditionalFormats.clearAll();
 
-            // 3. LOAD TEAM COLORS
+            // 3. LOAD TEAM COLORS (Safe Mode)
             let teamRules = [];
             const teamTable = teamSheet.tables.getItem("Team");
             const nameCol = teamTable.columns.getItem("First Name").getDataBodyRange();
@@ -53,13 +58,13 @@ window.FormattingLogic = {
 
             for (let i = 0; i < names.length; i++) {
                 const name = names[i][0];
-                // Safe Access
                 if (colors[i] && colors[i][0]) {
                     let hex = colors[i][0].format.fill.color;
                     
-                    // FILTER: If White/Null, we SKIP adding a rule.
-                    // This lets the row "fall through" to the Generic Blue rule (Layer 4).
-                    const isInvalid = !hex || hex === "null" || hex === "#FFFFFF";
+                    // FILTER: Case-Insensitive Check for White/Null
+                    // If the user has no color, we MUST skip this rule so the Generic Blue rule applies.
+                    let isInvalid = !hex || hex === "null";
+                    if (typeof hex === 'string' && hex.toUpperCase() === "#FFFFFF") isInvalid = true;
                     
                     if (name && !isInvalid) { 
                         teamRules.push({ 
@@ -69,33 +74,33 @@ window.FormattingLogic = {
                     }
                 }
             }
+            console.log(`Formatting: Loaded ${teamRules.length} color rules.`);
 
             // =================================================================
-            // APPLY RULES (Execution Order: TOP -> BOTTOM)
-            // First Rule Added = Priority #1
+            // APPLY RULES (Order: FIRST ADDED = TOP PRIORITY)
             // =================================================================
 
-            // --- PRIORITY 1: PROGRESS BAR (Overlay) ---
-            // Must be top to grey out the colors below it
+            // --- 1. PROGRESS BAR (Top Layer) ---
+            // Greys out the COMPLETED portion of the bar.
             const fProg = gridRange.conditionalFormats.add(Excel.ConditionalFormatType.custom);
             fProg.custom.rule.formula = '=AND(K$6>=$E8, K$6<=$F8, ISNUMBER($H8), ((K$6-$E8)/($F8-$E8+1)) < $H8)';
-            fProg.custom.format.fill.color = "#D9D9D9";
-            fProg.stopIfTrue = false; // Allow seeing through to next layers if needed, but it's opaque grey.
+            fProg.custom.format.fill.color = "#D9D9D9"; // Grey 217
+            fProg.stopIfTrue = false; // Allow borders/text to show through if needed
 
-            // --- PRIORITY 2: TODAY BORDERS ---
-            // Sits on top of the Blue/Team bars.
+            // --- 2. TODAY BORDERS ---
+            // Red borders on Left/Right. NO FILL.
             const fToday = gridRange.conditionalFormats.add(Excel.ConditionalFormatType.custom);
             fToday.custom.rule.formula = '=K$6=TODAY()';
             fToday.custom.format.borders.getItem("Left").style = Excel.BorderLineStyle.continuous;
             fToday.custom.format.borders.getItem("Left").color = "#FF0000";
-            fToday.custom.format.borders.getItem("Left").weight = Excel.BorderWeight.thick; // Make it visible
+            fToday.custom.format.borders.getItem("Left").weight = Excel.BorderWeight.thick;
             fToday.custom.format.borders.getItem("Right").style = Excel.BorderLineStyle.continuous;
             fToday.custom.format.borders.getItem("Right").color = "#FF0000";
             fToday.custom.format.borders.getItem("Right").weight = Excel.BorderWeight.thick;
-            fToday.stopIfTrue = false; // CRITICAL: Must be false so the Fill Color (Blue/Team) shows through!
+            fToday.stopIfTrue = false; // CRITICAL: Must be FALSE so the Blue/Team color below shows through!
 
-            // --- PRIORITY 3: TEAM COLORS ---
-            // Specific overrides for people with assigned colors
+            // --- 3. TEAM COLORS (Specific Overrides) ---
+            // Only added for people who explicitly have a color (not white).
             for (let member of teamRules) {
                 const safeName = member.name.replace(/"/g, '""');
 
@@ -103,7 +108,7 @@ window.FormattingLogic = {
                 const fBar = gridRange.conditionalFormats.add(Excel.ConditionalFormatType.custom);
                 fBar.custom.rule.formula = `=AND(ISNUMBER($E8), K$6>=$E8, K$6<=$F8, UPPER(TRIM($C8))="${safeName}")`;
                 fBar.custom.format.fill.color = member.color;
-                fBar.stopIfTrue = true; // Stop here. Don't turn Blue.
+                fBar.stopIfTrue = true; // Stop here. Do not fall through to Blue.
 
                 // Name Cell
                 const fName = namesRange.conditionalFormats.add(Excel.ConditionalFormatType.custom);
@@ -112,14 +117,14 @@ window.FormattingLogic = {
                 fName.stopIfTrue = true;
             }
 
-            // --- PRIORITY 4: GENERIC BLUE (Fallback) ---
-            // Everyone else (including White/Null colors) gets this.
+            // --- 4. GENERIC BLUE (Default Task) ---
+            // Catches everyone else (White/Null/No-Match).
             const fBlue = gridRange.conditionalFormats.add(Excel.ConditionalFormatType.custom);
             fBlue.custom.rule.formula = '=AND(ISNUMBER($E8), K$6>=$E8, K$6<=$F8)'; 
-            fBlue.custom.format.fill.color = "#0070C0"; 
-            fBlue.stopIfTrue = true; // Stop here. Don't show Holidays/PTO underneath the bar.
+            fBlue.custom.format.fill.color = "#0070C0"; // Blue 192
+            fBlue.stopIfTrue = true; // Stop here. Do not show Holidays underneath.
 
-            // --- PRIORITY 5: PARENT ROW ---
+            // --- 5. PARENT ROW BACKGROUND ---
             const fParent = gridRange.conditionalFormats.add(Excel.ConditionalFormatType.custom);
             fParent.custom.rule.formula = '=AND($A8<>"", ISERROR(SEARCH(".", $A8)))';
             fParent.custom.format.fill.color = "#D9D9D9"; 
@@ -130,20 +135,20 @@ window.FormattingLogic = {
             fParentName.custom.format.fill.color = "#D9D9D9";
             fParentName.stopIfTrue = true;
 
-            // --- PRIORITY 6: HOLIDAYS ---
+            // --- 6. HOLIDAYS ---
             const fHol = gridRange.conditionalFormats.add(Excel.ConditionalFormatType.custom);
             fHol.custom.rule.formula = '=COUNTIF(ListHolidays,K$6)>0';
-            fHol.custom.format.fill.color = "#C8C8C8"; 
+            fHol.custom.format.fill.color = "#C8C8C8"; // Grey 200
             fHol.stopIfTrue = false;
 
-            // --- PRIORITY 7: PTO (Bottom) ---
+            // --- 7. PTO (Bottom Priority) ---
             const fPTO = gridRange.conditionalFormats.add(Excel.ConditionalFormatType.custom);
             fPTO.custom.rule.formula = '=SUMPRODUCT((Who=$C8)*(StartDate<=K$6)*((StartDate+NumberDays-1)>=K$6))>0';
-            fPTO.custom.format.fill.color = "#EAEAEA";
+            fPTO.custom.format.fill.color = "#EAEAEA"; // Grey 234
             fPTO.stopIfTrue = false;
 
             await context.sync();
-            console.log("Formatting Engine: Rules Applied Successfully (FIFO Order).");
+            console.log("Formatting Engine: Rules Applied Successfully.");
 
         } catch (error) {
             console.error("Formatting Logic Error:", error);
