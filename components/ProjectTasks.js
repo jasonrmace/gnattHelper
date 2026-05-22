@@ -296,6 +296,8 @@ const ProjectTasks = ({ project, onBack }) => {
         } catch (error) { console.error(error); }
     };
 
+    console.log(project);
+
     // ============================================================
     // UI RENDER
     // ============================================================
