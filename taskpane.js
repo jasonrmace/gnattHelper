@@ -15,7 +15,7 @@ const ProjectList = window.ProjectList;
 function App() {
     // --- STATE ---
     // UPDATED VERSION
-    const [version] = useState("v4.2.3");
+    const [version] = useState("v4.2.4");
     const [activeTab, setActiveTab] = useState("ProjectList");
     
     const [isValidFile, setIsValidFile] = useState(true);
