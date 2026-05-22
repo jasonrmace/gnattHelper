@@ -17,7 +17,7 @@ const MainNavbar = ({ activeTab, setActiveTab, isFileValid }) => {
         }, 20);
     };
 
-    // --- NEW: TRIGGER VISUAL UPDATE ---
+    // --- 1. TRIGGER GRID ALERTS (VisualLogic) ---
     const handleRefreshVisuals = async () => {
         if (isSyncing) return;
         setIsSyncing(true);
@@ -27,13 +27,31 @@ const MainNavbar = ({ activeTab, setActiveTab, isFileValid }) => {
                     await window.VisualLogic.refreshGridAlerts(context);
                 }
             });
-            // Simple visual feedback (alert or just logging)
             console.log("Visuals Refreshed");
         } catch (e) {
             console.error(e);
         } finally {
             setIsSyncing(false);
-            setExpanded(false); // Close menu
+            setExpanded(false); 
+        }
+    };
+
+    // --- 2. TRIGGER FORMATTING RESET (FormattingLogic) ---
+    const handleResetFormatting = async () => {
+        if (isSyncing) return;
+        setIsSyncing(true);
+        try {
+            await Excel.run(async (context) => {
+                if (window.FormattingLogic) {
+                    await window.FormattingLogic.generateSmartRules(context);
+                }
+            });
+            console.log("Formatting Reset");
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setIsSyncing(false);
+            setExpanded(false);
         }
     };
 
@@ -70,10 +88,18 @@ const MainNavbar = ({ activeTab, setActiveTab, isFileValid }) => {
                             <Nav.Link eventKey="AddProject">Add a New Project</Nav.Link>
                             
                             <NavDropdown title="Options" id="basic-nav-dropdown">
-                                {/* NEW BUTTON */}
+                                {/* ACTION 1: GRID ALERTS */}
                                 <NavDropdown.Item onClick={handleRefreshVisuals} disabled={isSyncing}>
+                                    <i className="fas fa-bell me-2 text-muted"></i>
                                     {isSyncing ? "Syncing..." : "Refresh Grid Alerts"}
                                 </NavDropdown.Item>
+
+                                {/* ACTION 2: FORMATTING (New) */}
+                                <NavDropdown.Item onClick={handleResetFormatting} disabled={isSyncing}>
+                                    <i className="fas fa-paint-roller me-2 text-muted"></i>
+                                    Reset Formatting Rules
+                                </NavDropdown.Item>
+                                
                                 <NavDropdown.Divider />
                                 <NavDropdown.Item href="#action/3.1">Export CSV</NavDropdown.Item>
                                 <NavDropdown.Item href="#action/3.2">Print View</NavDropdown.Item>
