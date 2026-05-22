@@ -15,7 +15,7 @@ const ProjectList = window.ProjectList;
 function App() {
     // --- STATE ---
     // UPDATED VERSION
-    const [version] = useState("v4.2.4");
+    const [version] = useState("v4.2.5");
     const [activeTab, setActiveTab] = useState("ProjectList");
     
     const [isValidFile, setIsValidFile] = useState(true);
@@ -94,7 +94,7 @@ function App() {
                 if (currentID) {
                     const idNum = parseFloat(currentID);
                     if (Number.isInteger(idNum)) {
-                        finalText = `SECTION ${currentID}: ${currentName}`;
+                        finalText = `PROJECT ${currentID}: ${currentName}`;
                     } else if (!isNaN(idNum)) {
                         const parentID = Math.floor(idNum).toString();
                         const foundRange = sheet.getRange("A:A").find(parentID, { completeMatch: true, matchCase: false });
@@ -102,7 +102,7 @@ function App() {
                         parentNameRange.load("text");
                         await context.sync(); // May fail if not found, good enough for now
                         const pName = parentNameRange.text[0][0];
-                        finalText = `SECTION ${parentID}: ${pName} (Task ${currentID})`;
+                        finalText = `PROJECT ${parentID}: ${pName} (Task ${currentID})`;
                     }
                 }
 
