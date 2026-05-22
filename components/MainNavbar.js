@@ -32,7 +32,7 @@ const MainNavbar = ({ activeTab, setActiveTab, isFileValid }) => {
             console.error(e);
         } finally {
             setIsSyncing(false);
-            setExpanded(false); 
+            setExpanded(false);
         }
     };
 
@@ -59,7 +59,8 @@ const MainNavbar = ({ activeTab, setActiveTab, isFileValid }) => {
         <Navbar 
             expand="lg" 
             bg="dark" 
-            className="p-3 navbar-dark" 
+            // Added flex-shrink-0 to ensure stability in the new layout
+            className="p-3 navbar-dark flex-shrink-0" 
             activeKey={activeTab} 
             expanded={expanded}
             onToggle={() => handleLayoutChange(!expanded)}

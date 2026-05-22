@@ -15,7 +15,7 @@ const ProjectList = window.ProjectList;
 function App() {
     // --- STATE ---
     // UPDATED VERSION
-    const [version] = useState("v4.2.6");
+    const [version] = useState("v4.2.7");
     const [activeTab, setActiveTab] = useState("ProjectList");
     
     const [isValidFile, setIsValidFile] = useState(true);
@@ -93,6 +93,7 @@ function App() {
 
                 if (currentID) {
                     const idNum = parseFloat(currentID);
+                    
                     if (Number.isInteger(idNum)) {
                         finalText = `PROJECT ${currentID}: ${currentName}`;
                     } else if (!isNaN(idNum)) {
@@ -100,7 +101,9 @@ function App() {
                         const foundRange = sheet.getRange("A:A").find(parentID, { completeMatch: true, matchCase: false });
                         const parentNameRange = foundRange.getOffsetRange(0, 1);
                         parentNameRange.load("text");
-                        await context.sync(); // May fail if not found, good enough for now
+                        
+                        await context.sync(); 
+                        
                         const pName = parentNameRange.text[0][0];
                         finalText = `PROJECT ${parentID}: ${pName} (Task ${currentID})`;
                     }
@@ -123,16 +126,21 @@ function App() {
     };
 
 
-    // --- UI RENDER ---
+    // --- UI RENDER (FLEXBOX LAYOUT FIX) ---
     return (
-        <>
-            <MainNavbar 
-                activeTab={activeTab} 
-                setActiveTab={setActiveTab} 
-                isFileValid={isValidFile}
-            />
+        <div className="d-flex flex-column vh-100 bg-white">
             
-            <Container className="p-3" style={{ paddingBottom: "50px" }}>
+            {/* 1. FIXED HEADER (No Scroll) */}
+            <div className="flex-shrink-0">
+                <MainNavbar 
+                    activeTab={activeTab} 
+                    setActiveTab={setActiveTab} 
+                    isFileValid={isValidFile}
+                />
+            </div>
+            
+            {/* 2. SCROLLABLE BODY (Takes remaining space) */}
+            <div className="flex-grow-1 overflow-auto p-3">
                 {!isValidFile ? (
                     <div className="mt-4">
                         <Alert variant="danger" className="shadow-sm border-danger text-center">
@@ -147,17 +155,19 @@ function App() {
                         {activeTab === "AddProject" && <CreateProject />}
                     </>
                 )}
+            </div>
 
-                <div className="fixed-bottom bg-primary text-white shadow-lg px-3 py-2 d-flex justify-content-between align-items-center" 
-                     style={{ fontSize: "0.8rem", borderTop: "3px solid #0d6efd" }}>
-                    <span className="fw-bold text-truncate" style={{maxWidth: "80%"}}>
-                        <i className="fas fa-crosshairs me-2 opacity-50"></i>
-                        {hudText}
-                    </span>
-                    <span className="opacity-50" style={{fontSize: "0.7rem"}}>{version}</span>
-                </div>
-            </Container>
-        </>
+            {/* 3. FIXED FOOTER (No Scroll) */}
+            <div className="bg-primary text-white shadow-lg px-3 py-2 d-flex justify-content-between align-items-center flex-shrink-0" 
+                 style={{ fontSize: "0.8rem", borderTop: "3px solid #0d6efd", zIndex: 1030 }}>
+                <span className="fw-bold text-truncate" style={{maxWidth: "80%"}}>
+                    <i className="fas fa-crosshairs me-2 opacity-50"></i>
+                    {hudText}
+                </span>
+                <span className="opacity-50" style={{fontSize: "0.7rem"}}>{version}</span>
+            </div>
+
+        </div>
     );
 }
 
