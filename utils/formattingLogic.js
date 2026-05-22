@@ -1,9 +1,9 @@
 /* global Excel */
 
 // ==============================================================================
-// FORMATTING LOGIC ENGINE (Phase 4 Migration)
+// FORMATTING LOGIC ENGINE (Phase 4 Fix)
 // Replaces VBA 'GenerateSmartRules'
-// Handles Conditional Formatting (Bars, Colors, Holidays, Today Line)
+// Fixes: Correctly reads individual cell colors for Team Members
 // ==============================================================================
 
 window.FormattingLogic = {
@@ -14,7 +14,6 @@ window.FormattingLogic = {
             const teamSheet = context.workbook.worksheets.getItem("Team");
 
             // 1. DEFINE RANGES
-            // Find Footer to get height
             const footerRange = sheet.getRange("A:A").find("DO NOT DELETE", { completeMatch: false, matchCase: false });
             footerRange.load("rowIndex");
             await context.sync();
@@ -23,77 +22,78 @@ window.FormattingLogic = {
             const endRow = footerRange.rowIndex - 1;
             const rowCount = endRow - startRow + 1;
             
-            // Find Date Extent (Col K to End)
             const headerRange = sheet.getRange("K6").getExtendedRange(Excel.KeyboardDirection.right);
             headerRange.load("columnCount");
             await context.sync();
             const colCount = headerRange.columnCount;
 
-            // The Main Grid (Dates)
-            const gridRange = sheet.getRangeByIndexes(startRow, 10, rowCount, colCount); // Col K (10)
-            // The Names Column (Lead)
-            const namesRange = sheet.getRangeByIndexes(startRow, 2, rowCount, 1); // Col C (2)
+            // The Main Grid & Names Column
+            const gridRange = sheet.getRangeByIndexes(startRow, 10, rowCount, colCount); // Col K
+            const namesRange = sheet.getRangeByIndexes(startRow, 2, rowCount, 1); // Col C
 
             // 2. CLEAN SLATE
-            // We clear existing rules to prevent duplicates/conflicts
             gridRange.conditionalFormats.clearAll();
             namesRange.conditionalFormats.clearAll();
 
-            // 3. LOAD TEAM COLORS
+            // 3. LOAD TEAM COLORS (FIXED)
             let teamRules = [];
             const teamTable = teamSheet.tables.getItem("Team");
             const nameCol = teamTable.columns.getItem("First Name").getDataBodyRange();
             const colorCol = teamTable.columns.getItem("Color").getDataBodyRange();
             
             nameCol.load("values");
-            colorCol.load("format/fill/color");
+            // USE getCellProperties to get individual colors
+            const colorProps = colorCol.getCellProperties({ format: { fill: { color: true } } });
+            
             await context.sync();
 
+            const names = nameCol.values;
+            const colors = colorProps.value; // Result of getCellProperties
+
             // Map names to colors
-            for (let i = 0; i < nameCol.values.length; i++) {
-                const name = nameCol.values[i][0];
-                const color = colorCol.format.fill.color;
-                if (name && color) {
-                    teamRules.push({ name: name.toString().toUpperCase().trim(), color: color });
+            for (let i = 0; i < names.length; i++) {
+                const name = names[i][0];
+                // Access the color from the properties 2D array
+                const hex = colors[i].format.fill.color; 
+                
+                if (name && hex && hex !== "#FFFFFF") { // Ignore white/empty
+                    teamRules.push({ 
+                        name: name.toString().toUpperCase().trim(), 
+                        color: hex 
+                    });
                 }
             }
 
             // =================================================================
-            // APPLY RULES (Order Matters: First Applied = Bottom Layer)
-            // In Office.js 'add' puts rule at the TOP. 
-            // So we add HIGHEST PRIORITY LAST.
+            // APPLY RULES (Stack Order: Last Added = Top Priority)
             // =================================================================
 
-            // --- LAYER 1: PARENT ROW BACKGROUND (Bottom) ---
-            // Formula: Row is integer (Parent)
+            // LAYER 1: PARENT ROW (Bottom)
             const fParent = gridRange.conditionalFormats.add(Excel.ConditionalFormatType.custom);
             fParent.custom.rule.formula = '=AND($A8<>"", ISERROR(SEARCH(".", $A8)))';
-            fParent.custom.format.fill.color = "#D9D9D9"; // Grey 217
+            fParent.custom.format.fill.color = "#D9D9D9"; 
             
             const fParentName = namesRange.conditionalFormats.add(Excel.ConditionalFormatType.custom);
             fParentName.custom.rule.formula = '=AND($A8<>"", ISERROR(SEARCH(".", $A8)))';
             fParentName.custom.format.fill.color = "#D9D9D9";
 
-            // --- LAYER 2: HOLIDAYS ---
+            // LAYER 2: HOLIDAYS
             const fHol = gridRange.conditionalFormats.add(Excel.ConditionalFormatType.custom);
             fHol.custom.rule.formula = '=COUNTIF(ListHolidays,K$6)>0';
-            fHol.custom.format.fill.color = "#C8C8C8"; // Grey 200
+            fHol.custom.format.fill.color = "#C8C8C8";
 
-            // --- LAYER 3: PTO ---
+            // LAYER 3: PTO
             const fPTO = gridRange.conditionalFormats.add(Excel.ConditionalFormatType.custom);
-            // Note: JS strings need escaped quotes
             fPTO.custom.rule.formula = '=SUMPRODUCT((Who=$C8)*(StartDate<=K$6)*((StartDate+NumberDays-1)>=K$6))>0';
-            fPTO.custom.format.fill.color = "#EAEAEA"; // Grey 234
+            fPTO.custom.format.fill.color = "#EAEAEA";
 
-            // --- LAYER 4: GENERIC BLUE (Fallback) ---
-            // Applied if name not in list
+            // LAYER 4: GENERIC BLUE (Fallback)
+            // This sits below Team Colors. 
             const fBlue = gridRange.conditionalFormats.add(Excel.ConditionalFormatType.custom);
-            // Use a simplified check for robustness or replicate exact VBA
             fBlue.custom.rule.formula = '=AND(ISNUMBER($E8), K$6>=$E8, K$6<=$F8)'; 
-            fBlue.custom.format.fill.color = "#0070C0"; // Standard Blue
+            fBlue.custom.format.fill.color = "#0070C0";
 
-            // --- LAYER 5: TEAM COLORS (Dynamic) ---
-            // We loop and add them. Since we want them ON TOP of generic blue, we add them AFTER.
+            // LAYER 5: TEAM COLORS (Dynamic - Sits ON TOP of Blue)
             for (let member of teamRules) {
                 // Grid Bar
                 const fBar = gridRange.conditionalFormats.add(Excel.ConditionalFormatType.custom);
@@ -106,21 +106,19 @@ window.FormattingLogic = {
                 fName.custom.format.fill.color = member.color;
             }
 
-            // --- LAYER 6: TODAY BORDER (High Priority) ---
+            // LAYER 6: TODAY BORDER
             const fToday = gridRange.conditionalFormats.add(Excel.ConditionalFormatType.custom);
             fToday.custom.rule.formula = '=K$6=TODAY()';
             fToday.custom.format.borders.getItem("Left").style = Excel.BorderLineStyle.continuous;
-            fToday.custom.format.borders.getItem("Left").color = "#FF0000"; // Red
+            fToday.custom.format.borders.getItem("Left").color = "#FF0000";
             fToday.custom.format.borders.getItem("Right").style = Excel.BorderLineStyle.continuous;
             fToday.custom.format.borders.getItem("Right").color = "#FF0000";
 
-            // --- LAYER 7: PROGRESS BAR (Highest Priority - Overlay) ---
-            // It greys out the 'completed' portion of the bar
-            // We assume Col H is % Done. Using Formula R1C1 or A1? A1 relative is tricky here.
-            // Let's find the % column dynamically or assume H (Col 8)
+            // LAYER 7: PROGRESS BAR (Top Overlay)
+            // We assume % Done is in Col H (Column 8)
             const fProg = gridRange.conditionalFormats.add(Excel.ConditionalFormatType.custom);
             fProg.custom.rule.formula = '=AND(K$6>=$E8, K$6<=$F8, ISNUMBER($H8), ((K$6-$E8)/($F8-$E8+1)) < $H8)';
-            fProg.custom.format.fill.color = "#D9D9D9"; // Grey Overlay
+            fProg.custom.format.fill.color = "#D9D9D9";
 
             await context.sync();
             console.log("Formatting Engine: Rules Applied.");
