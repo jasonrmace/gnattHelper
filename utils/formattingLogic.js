@@ -1,11 +1,12 @@
 /* global Excel */
 
 // ==============================================================================
-// FORMATTING LOGIC ENGINE (Phase 4 Fix - Attempt 2)
+// FORMATTING LOGIC ENGINE (Phase 4 Final)
 // Replaces VBA 'GenerateSmartRules'
 // Fixes: 
-// 1. Corrects 2D Array access for Team Colors (colors[i][0])
-// 2. Explicitly sets stopIfTrue = false for correct layering
+// 1. Allows White/Default colors to override Generic Blue.
+// 2. Corrects 2D Array access (colors[i][0]).
+// 3. Enforces correct visual stacking (Last Added = Top).
 // ==============================================================================
 
 window.FormattingLogic = {
@@ -37,45 +38,49 @@ window.FormattingLogic = {
             gridRange.conditionalFormats.clearAll();
             namesRange.conditionalFormats.clearAll();
 
-            // 3. LOAD TEAM COLORS (FIXED)
+            // 3. LOAD TEAM COLORS
             let teamRules = [];
             const teamTable = teamSheet.tables.getItem("Team");
             const nameCol = teamTable.columns.getItem("First Name").getDataBodyRange();
             const colorCol = teamTable.columns.getItem("Color").getDataBodyRange();
             
             nameCol.load("values");
-            // USE getCellProperties to get individual colors
+            // Fetch format properties (returns 2D array)
             const colorProps = colorCol.getCellProperties({ format: { fill: { color: true } } });
             
             await context.sync();
 
             const names = nameCol.values;
-            const colors = colorProps.value; // 2D Array: [Row][Col]
+            const colors = colorProps.value; 
 
-            // Map names to colors
             for (let i = 0; i < names.length; i++) {
                 const name = names[i][0];
-                // FIX: Access [0] because 'colors[i]' is a row array
-                const hex = colors[i][0].format.fill.color; 
-                
-                if (name && hex && hex !== "#FFFFFF" && hex !== "null") { 
-                    teamRules.push({ 
-                        name: name.toString().toUpperCase().trim(), 
-                        color: hex 
-                    });
+                // Safe Access: Check if row exists
+                if (colors[i] && colors[i][0]) {
+                    let hex = colors[i][0].format.fill.color;
+                    
+                    // fallback for transparent/null
+                    if (!hex || hex === "null") hex = "#FFFFFF"; 
+
+                    // LOGIC CHANGE: We ALLOW #FFFFFF so it blocks the Blue rule
+                    if (name) { 
+                        teamRules.push({ 
+                            name: name.toString().toUpperCase().trim(), 
+                            color: hex 
+                        });
+                    }
                 }
             }
 
             // =================================================================
             // APPLY RULES (Stack Order: Last Added = Top Priority)
-            // We assume 'add' pushes to top of stack.
             // =================================================================
 
             // --- LAYER 1: PARENT ROW (Bottom) ---
             const fParent = gridRange.conditionalFormats.add(Excel.ConditionalFormatType.custom);
             fParent.custom.rule.formula = '=AND($A8<>"", ISERROR(SEARCH(".", $A8)))';
             fParent.custom.format.fill.color = "#D9D9D9"; 
-            fParent.stopIfTrue = false; // Critical for layering
+            fParent.stopIfTrue = false; 
             
             const fParentName = namesRange.conditionalFormats.add(Excel.ConditionalFormatType.custom);
             fParentName.custom.rule.formula = '=AND($A8<>"", ISERROR(SEARCH(".", $A8)))';
@@ -101,17 +106,20 @@ window.FormattingLogic = {
             fBlue.stopIfTrue = false;
 
             // --- LAYER 5: TEAM COLORS (Dynamic - Sits ON TOP of Blue) ---
+            // Even if color is White, it sits on top of Blue, effectively "Painting over" it.
             for (let member of teamRules) {
+                // Safe Name Escape
+                const safeName = member.name.replace(/"/g, '""');
+
                 // Grid Bar
                 const fBar = gridRange.conditionalFormats.add(Excel.ConditionalFormatType.custom);
-                // Escaped quote for name safety
-                fBar.custom.rule.formula = `=AND(ISNUMBER($E8), K$6>=$E8, K$6<=$F8, UPPER(TRIM($C8))="${member.name.replace(/"/g, '""')}")`;
+                fBar.custom.rule.formula = `=AND(ISNUMBER($E8), K$6>=$E8, K$6<=$F8, UPPER(TRIM($C8))="${safeName}")`;
                 fBar.custom.format.fill.color = member.color;
                 fBar.stopIfTrue = false;
 
                 // Name Cell
                 const fName = namesRange.conditionalFormats.add(Excel.ConditionalFormatType.custom);
-                fName.custom.rule.formula = `=UPPER(TRIM($C8))="${member.name.replace(/"/g, '""')}"`;
+                fName.custom.rule.formula = `=UPPER(TRIM($C8))="${safeName}"`;
                 fName.custom.format.fill.color = member.color;
                 fName.stopIfTrue = false;
             }
@@ -126,7 +134,6 @@ window.FormattingLogic = {
             fToday.stopIfTrue = false;
 
             // --- LAYER 7: PROGRESS BAR (Top Overlay) ---
-            // Grey out completed portion
             const fProg = gridRange.conditionalFormats.add(Excel.ConditionalFormatType.custom);
             fProg.custom.rule.formula = '=AND(K$6>=$E8, K$6<=$F8, ISNUMBER($H8), ((K$6-$E8)/($F8-$E8+1)) < $H8)';
             fProg.custom.format.fill.color = "#D9D9D9";
