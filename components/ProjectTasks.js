@@ -225,11 +225,22 @@ const ProjectTasks = ({ project, onBack }) => {
                         }
                     }
 
-                    // 2. Get Template
-                    let namedItem = sheet.names.getItemOrNullObject(templateName);
-                    await context.sync();
-                    if (namedItem.isNullObject) namedItem = context.workbook.names.getItemOrNullObject(templateName);
-                    if (namedItem.isNullObject) throw new Error(`Template '${templateName}' not found.`);
+                    // 2. Get Template 
+                    let namedItem = sheet.names.getItemOrNullObject(templateName); 
+                    await context.sync(); 
+
+                    if (namedItem.isNullObject) {
+                        // This creates a new object shell
+                        namedItem = context.workbook.names.getItemOrNullObject(templateName); 
+                        
+                        // FIX: You must sync again to load the new object's properties
+                        await context.sync(); 
+                    }
+
+                    if (namedItem.isNullObject) {
+                        throw new Error(`Template '${templateName}' not found.`);
+                    }
+
                     
                     const sourceRow = namedItem.getRange().getEntireRow();
 
