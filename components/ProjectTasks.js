@@ -78,13 +78,13 @@ const ProjectTasks = ({ project, onBack }) => {
                         const dotCount = (idStr.match(/\./g) || []).length;
                         const depth = Math.max(0, dotCount - 1);
                         
-                        // CLEAN NAME: Remove leading arrows (↑) and spaces
+                        // Remove leading arrows/spaces
                         const cleanName = row[1].toString().replace(/^[↑\s]+/, '');
 
                         projectTasks.push({
                             id: idStr,
                             rowIndex: dataStartIndex + index,
-                            name: cleanName, 
+                            name: cleanName,
                             lead: row[2],
                             start: row[4],
                             end: row[5],
@@ -152,7 +152,6 @@ const ProjectTasks = ({ project, onBack }) => {
             await Excel.run(async (context) => {
                 const sheet = context.workbook.worksheets.getItem("GanttChart");
 
-                // --- EDIT MODE ---
                 if (formMode === "edit") {
                     const rowIndex = activeTask.rowIndex;
                     sheet.getCell(rowIndex, 1).values = [[formData.name]];
@@ -167,7 +166,6 @@ const ProjectTasks = ({ project, onBack }) => {
                     }
                     sheet.getCell(rowIndex, 7).values = [[formData.percent]];
                 } 
-                // --- CREATE MODE ---
                 else {
                     let templateName = "Level2Task"; 
                     let insertRowIndex = -1;
@@ -198,14 +196,11 @@ const ProjectTasks = ({ project, onBack }) => {
                     if (namedItem.isNullObject) throw new Error(`Template '${templateName}' not found.`);
                     
                     const sourceRow = namedItem.getRange().getEntireRow();
-
-                    // Insert & Copy
                     const insertRange = sheet.getRange(`${insertRowIndex + 1}:${insertRowIndex + 1}`);
                     insertRange.insert(Excel.InsertShiftDirection.down);
                     const newRow = sheet.getRange(`${insertRowIndex + 1}:${insertRowIndex + 1}`);
                     newRow.copyFrom(sourceRow, Excel.RangeCopyType.all);
 
-                    // Write Data
                     sheet.getCell(insertRowIndex, 1).values = [[formData.name]];
                     if (formData.lead) sheet.getCell(insertRowIndex, 2).values = [[formData.lead]];
                     if (formData.start) sheet.getCell(insertRowIndex, 4).values = [[formData.start]];
@@ -324,13 +319,21 @@ const ProjectTasks = ({ project, onBack }) => {
                                             {t.percent || "0%"}
                                         </Badge>
                                     </div>
-                                    <div className="d-flex justify-content-between border-top pt-1 mt-1">
+                                    
+                                    {/* UPDATED DATE ROW MATCHING PROJECT LIST STYLE */}
+                                    <div className="d-flex justify-content-between border-top pt-1 mt-1 px-1">
                                         <span className="d-flex align-items-center">
-                                            <i className="fas fa-calendar-days me-2 text-secondary opacity-50" style={{width: "14px"}}></i> 
-                                            {t.start || "TBD"}
+                                            <i className="fas fa-calendar-days me-2 text-secondary" style={{width: "14px", textAlign: "center"}}></i>
+                                            {t.start === "TBD" || t.start === "" ? "TBD" : t.start}
                                         </span>
-                                        {t.end && <span>➔ {t.end}</span>}
+                                        {t.start !== "TBD" && t.start !== "" && (
+                                            <>
+                                                <span className="mx-1 text-muted"><i className="fas fa-arrow-right" style={{fontSize: "0.7rem"}}></i></span>
+                                                <span>{t.end}</span>
+                                            </>
+                                        )}
                                     </div>
+
                                 </div>
                             </Card.Body>
                         </Card>
@@ -423,4 +426,3 @@ const ProjectTasks = ({ project, onBack }) => {
 };
 
 window.ProjectTasks = ProjectTasks;
-
