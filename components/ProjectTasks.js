@@ -77,10 +77,14 @@ const ProjectTasks = ({ project, onBack }) => {
                     if (idStr.startsWith(parentIdPrefix) && idStr !== project.id.toString()) {
                         const dotCount = (idStr.match(/\./g) || []).length;
                         const depth = Math.max(0, dotCount - 1);
+                        
+                        // CLEAN NAME: Remove leading arrows (↑) and spaces
+                        const cleanName = row[1].toString().replace(/^[↑\s]+/, '');
+
                         projectTasks.push({
                             id: idStr,
                             rowIndex: dataStartIndex + index,
-                            name: row[1],
+                            name: cleanName, 
                             lead: row[2],
                             start: row[4],
                             end: row[5],
@@ -158,7 +162,6 @@ const ProjectTasks = ({ project, onBack }) => {
                     if (formData.start && formData.end) {
                         const s = new Date(formData.start);
                         const e = new Date(formData.end);
-                        // Added +1 for inclusive count
                         const diff = Math.ceil(Math.abs(e - s) / (1000 * 60 * 60 * 24)) + 1;
                         sheet.getCell(rowIndex, 6).values = [[diff]];
                     }
@@ -182,7 +185,6 @@ const ProjectTasks = ({ project, onBack }) => {
                         }
                     }
 
-                    // Load named item
                     let namedItem = sheet.names.getItemOrNullObject(templateName);
                     namedItem.load("isNullObject"); 
                     await context.sync();
@@ -263,7 +265,6 @@ const ProjectTasks = ({ project, onBack }) => {
                     <Button variant="light" size="sm" className="me-2 text-muted" onClick={onBack} title="Back">
                         <i className="fas fa-arrow-left"></i>
                     </Button>
-                    {/* HEADER UPDATE: Swapped Name and ID */}
                     <div style={{lineHeight: "1.1"}}>
                         <h6 className="m-0 fw-bold text-primary">{project.name}</h6>
                         <small className="text-muted" style={{fontSize: "0.7rem"}}>Project {project.id} Task Manager</small>
@@ -422,3 +423,4 @@ const ProjectTasks = ({ project, onBack }) => {
 };
 
 window.ProjectTasks = ProjectTasks;
+
