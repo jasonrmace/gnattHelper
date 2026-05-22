@@ -136,7 +136,7 @@ const ProjectTasks = ({ project, onBack }) => {
         setShowForm(true);
     };
 
-    // --- 3. SAVE LOGIC (FIXED) ---
+    // --- 3. SAVE LOGIC ---
     const handleSave = async () => {
         if (!formData.name) {
             setStatus("Task Name is required.");
@@ -158,7 +158,7 @@ const ProjectTasks = ({ project, onBack }) => {
                     if (formData.start && formData.end) {
                         const s = new Date(formData.start);
                         const e = new Date(formData.end);
-                        // FIXED: Added +1 for inclusive count
+                        // Added +1 for inclusive count
                         const diff = Math.ceil(Math.abs(e - s) / (1000 * 60 * 60 * 24)) + 1;
                         sheet.getCell(rowIndex, 6).values = [[diff]];
                     }
@@ -182,14 +182,14 @@ const ProjectTasks = ({ project, onBack }) => {
                         }
                     }
 
-                    // FIXED: Correctly load named item
+                    // Load named item
                     let namedItem = sheet.names.getItemOrNullObject(templateName);
-                    namedItem.load("isNullObject"); // <--- CRITICAL FIX
+                    namedItem.load("isNullObject"); 
                     await context.sync();
 
                     if (namedItem.isNullObject) {
                         namedItem = context.workbook.names.getItemOrNullObject(templateName);
-                        namedItem.load("isNullObject"); // Load again for workbook scope
+                        namedItem.load("isNullObject"); 
                         await context.sync();
                     }
                     
@@ -211,7 +211,6 @@ const ProjectTasks = ({ project, onBack }) => {
                     if (formData.start && formData.end) {
                         const s = new Date(formData.start);
                         const e = new Date(formData.end);
-                        // FIXED: Added +1 for inclusive count
                         const diff = Math.ceil(Math.abs(e - s) / (1000 * 60 * 60 * 24)) + 1;
                         sheet.getCell(insertRowIndex, 6).values = [[diff]];
                     }
@@ -264,9 +263,10 @@ const ProjectTasks = ({ project, onBack }) => {
                     <Button variant="light" size="sm" className="me-2 text-muted" onClick={onBack} title="Back">
                         <i className="fas fa-arrow-left"></i>
                     </Button>
+                    {/* HEADER UPDATE: Swapped Name and ID */}
                     <div style={{lineHeight: "1.1"}}>
-                        <h6 className="m-0 fw-bold text-primary">Project {project.id}</h6>
-                        <small className="text-muted" style={{fontSize: "0.7rem"}}>Task Manager</small>
+                        <h6 className="m-0 fw-bold text-primary">{project.name}</h6>
+                        <small className="text-muted" style={{fontSize: "0.7rem"}}>Project {project.id} Task Manager</small>
                     </div>
                 </div>
                 <Button variant="primary" size="sm" onClick={openAddModal}>
