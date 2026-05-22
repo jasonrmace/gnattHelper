@@ -4,21 +4,17 @@ const { useState, useEffect } = React;
 const { Button, Card, Badge, Spinner, Modal, ButtonGroup, Form, Row, Col, Alert } = window.ReactBootstrap || {};
 
 const ProjectTasks = ({ project, onBack }) => {
-    // --- DATA STATE ---
     const [tasks, setTasks] = useState([]);
     const [teamMembers, setTeamMembers] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
 
-    // --- MODAL STATE ---
     const [showDelete, setShowDelete] = useState(false);
     const [showForm, setShowForm] = useState(false);
     
-    // --- SELECTION STATE ---
-    const [activeTask, setActiveTask] = useState(null); // The task being edited or deleted
-    const [parentTask, setParentTask] = useState(null); // The parent if adding a sub-task
-    const [formMode, setFormMode] = useState("add"); // "add", "sub", "edit"
+    const [activeTask, setActiveTask] = useState(null);
+    const [parentTask, setParentTask] = useState(null); 
+    const [formMode, setFormMode] = useState("add");
     
-    // --- FORM DATA ---
     const [formData, setFormData] = useState({
         name: "",
         lead: "",
@@ -26,13 +22,9 @@ const ProjectTasks = ({ project, onBack }) => {
         end: "",
         percent: "0%"
     });
-    const [status, setStatus] = useState(""); // Error/Status messages
+    const [status, setStatus] = useState("");
 
-    // ============================================================
-    // 1. INITIAL DATA LOADING
-    // ============================================================
-    
-    // Fetch Team Members for Dropdown
+    // --- 1. INITIAL LOADING ---
     useEffect(() => {
         const fetchTeam = async () => {
             try {
@@ -55,14 +47,11 @@ const ProjectTasks = ({ project, onBack }) => {
         fetchTeam();
     }, []);
 
-    // Fetch Tasks for this Project
     const fetchTasks = async () => {
         setIsLoading(true);
         try {
             await Excel.run(async (context) => {
                 const sheet = context.workbook.worksheets.getItem("GanttChart");
-                
-                // Find Footer
                 const footerRange = sheet.getRange("A:A").find("DO NOT DELETE", { completeMatch: false, matchCase: false });
                 footerRange.load("rowIndex");
                 await context.sync();
@@ -85,13 +74,9 @@ const ProjectTasks = ({ project, onBack }) => {
 
                 rawRows.forEach((row, index) => {
                     const idStr = row[0].toString();
-                    
-                    // Filter logic: Must start with "ProjectID." but not be the project itself
                     if (idStr.startsWith(parentIdPrefix) && idStr !== project.id.toString()) {
-                        
                         const dotCount = (idStr.match(/\./g) || []).length;
                         const depth = Math.max(0, dotCount - 1);
-
                         projectTasks.push({
                             id: idStr,
                             rowIndex: dataStartIndex + index,
@@ -115,11 +100,7 @@ const ProjectTasks = ({ project, onBack }) => {
 
     useEffect(() => { fetchTasks(); }, [project]);
 
-
-    // ============================================================
-    // 2. ACTIONS (OPEN MODALS)
-    // ============================================================
-
+    // --- 2. ACTIONS ---
     const openAddModal = () => {
         setFormMode("add");
         setParentTask(null);
@@ -139,17 +120,14 @@ const ProjectTasks = ({ project, onBack }) => {
     const openEditModal = (task) => {
         setFormMode("edit");
         setActiveTask(task);
-        
-        // Convert "10/25/2023" to "2023-10-25" for HTML Date Input
         const formatDateInput = (dateStr) => {
             if (!dateStr || dateStr === "TBD") return "";
             const d = new Date(dateStr);
             return !isNaN(d) ? d.toISOString().split('T')[0] : "";
         };
-
         setFormData({
             name: task.name,
-            lead: task.lead, // This is likely First Name only in Excel, which matches our value
+            lead: task.lead,
             start: formatDateInput(task.start),
             end: formatDateInput(task.end),
             percent: task.percent
@@ -158,11 +136,7 @@ const ProjectTasks = ({ project, onBack }) => {
         setShowForm(true);
     };
 
-
-    // ============================================================
-    // 3. SAVE LOGIC (CREATE & UPDATE)
-    // ============================================================
-
+    // --- 3. SAVE LOGIC (FIXED) ---
     const handleSave = async () => {
         if (!formData.name) {
             setStatus("Task Name is required.");
@@ -174,83 +148,62 @@ const ProjectTasks = ({ project, onBack }) => {
             await Excel.run(async (context) => {
                 const sheet = context.workbook.worksheets.getItem("GanttChart");
 
-                // --- SCENARIO A: EDIT EXISTING TASK ---
+                // --- EDIT MODE ---
                 if (formMode === "edit") {
                     const rowIndex = activeTask.rowIndex;
-                    
-                    // Update Name (Col B)
                     sheet.getCell(rowIndex, 1).values = [[formData.name]];
-                    
-                    // Update Lead (Col C)
                     if (formData.lead) sheet.getCell(rowIndex, 2).values = [[formData.lead]];
-
-                    // Update Start (Col E)
                     if (formData.start) sheet.getCell(rowIndex, 4).values = [[formData.start]];
 
-                    // Calc Duration (Col G) if dates exist
                     if (formData.start && formData.end) {
                         const s = new Date(formData.start);
                         const e = new Date(formData.end);
-                        const diff = Math.ceil(Math.abs(e - s) / (1000 * 60 * 60 * 24));
+                        // FIXED: Added +1 for inclusive count
+                        const diff = Math.ceil(Math.abs(e - s) / (1000 * 60 * 60 * 24)) + 1;
                         sheet.getCell(rowIndex, 6).values = [[diff]];
                     }
-
-                    // Update Percent (Col H)
                     sheet.getCell(rowIndex, 7).values = [[formData.percent]];
                 } 
-                
-                // --- SCENARIO B: CREATE NEW TASK (ADD or SUB) ---
+                // --- CREATE MODE ---
                 else {
-                    // 1. Determine Template Name
-                    let templateName = "Level2Task"; // Default (Level 1 Task)
+                    let templateName = "Level2Task"; 
                     let insertRowIndex = -1;
 
                     if (formMode === "sub" && parentTask) {
-                        // Logic: If parent is depth 0 (1.1), we need L2 template (Level3Task)
-                        // If parent is depth 1 (1.1.1), we need L3 template (Level4Task)
                         if (parentTask.depth === 0) templateName = "Level3Task";
                         else if (parentTask.depth >= 1) templateName = "Level4Task";
-                        
-                        // Insert immediately AFTER parent
                         insertRowIndex = parentTask.rowIndex + 1;
                     } else {
-                        // "Add Task": Insert at END of project block
-                        // If tasks exist, find the last one's row and add 1
                         if (tasks.length > 0) {
                             const lastTask = tasks[tasks.length - 1];
                             insertRowIndex = lastTask.rowIndex + 1;
                         } else {
-                            // No tasks yet? Insert after the Project Row
                             insertRowIndex = project.rowIndex + 1;
                         }
                     }
 
-                    // 2. Get Template 
-                    let namedItem = sheet.names.getItemOrNullObject(templateName); 
-                    await context.sync(); 
+                    // FIXED: Correctly load named item
+                    let namedItem = sheet.names.getItemOrNullObject(templateName);
+                    namedItem.load("isNullObject"); // <--- CRITICAL FIX
+                    await context.sync();
 
                     if (namedItem.isNullObject) {
-                        // This creates a new object shell
-                        namedItem = context.workbook.names.getItemOrNullObject(templateName); 
-                        
-                        // FIX: You must sync again to load the new object's properties
-                        await context.sync(); 
+                        namedItem = context.workbook.names.getItemOrNullObject(templateName);
+                        namedItem.load("isNullObject"); // Load again for workbook scope
+                        await context.sync();
                     }
-
-                    if (namedItem.isNullObject) {
-                        throw new Error(`Template '${templateName}' not found.`);
-                    }
-
+                    
+                    if (namedItem.isNullObject) throw new Error(`Template '${templateName}' not found.`);
                     
                     const sourceRow = namedItem.getRange().getEntireRow();
 
-                    // 3. Insert Row
+                    // Insert & Copy
                     const insertRange = sheet.getRange(`${insertRowIndex + 1}:${insertRowIndex + 1}`);
                     insertRange.insert(Excel.InsertShiftDirection.down);
                     const newRow = sheet.getRange(`${insertRowIndex + 1}:${insertRowIndex + 1}`);
                     newRow.copyFrom(sourceRow, Excel.RangeCopyType.all);
 
-                    // 4. Write Data
+                    // Write Data
                     sheet.getCell(insertRowIndex, 1).values = [[formData.name]];
                     if (formData.lead) sheet.getCell(insertRowIndex, 2).values = [[formData.lead]];
                     if (formData.start) sheet.getCell(insertRowIndex, 4).values = [[formData.start]];
@@ -258,17 +211,17 @@ const ProjectTasks = ({ project, onBack }) => {
                     if (formData.start && formData.end) {
                         const s = new Date(formData.start);
                         const e = new Date(formData.end);
-                        const diff = Math.ceil(Math.abs(e - s) / (1000 * 60 * 60 * 24));
+                        // FIXED: Added +1 for inclusive count
+                        const diff = Math.ceil(Math.abs(e - s) / (1000 * 60 * 60 * 24)) + 1;
                         sheet.getCell(insertRowIndex, 6).values = [[diff]];
                     }
                     
-                    // Highlight new row
                     newRow.select();
                 }
 
                 await context.sync();
                 setShowForm(false);
-                fetchTasks(); // Refresh UI
+                fetchTasks();
             });
         } catch (err) {
             console.error(err);
@@ -276,9 +229,7 @@ const ProjectTasks = ({ project, onBack }) => {
         }
     };
 
-    // ============================================================
-    // 4. DELETE LOGIC
-    // ============================================================
+    // --- 4. DELETE LOGIC ---
     const handleDelete = async () => {
         if (!activeTask) return;
         try {
@@ -294,7 +245,6 @@ const ProjectTasks = ({ project, onBack }) => {
         } catch (error) { console.error(error); }
     };
 
-    // --- HELPERS ---
     const handleJump = async (rowIndex) => {
         try {
             await Excel.run(async (context) => {
@@ -307,22 +257,16 @@ const ProjectTasks = ({ project, onBack }) => {
         } catch (error) { console.error(error); }
     };
 
-    console.log(project);
-
-    // ============================================================
-    // UI RENDER
-    // ============================================================
     return (
         <div className="mt-4">
-            {/* HEADER */}
             <div className="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom">
                 <div className="d-flex align-items-center">
                     <Button variant="light" size="sm" className="me-2 text-muted" onClick={onBack} title="Back">
                         <i className="fas fa-arrow-left"></i>
                     </Button>
                     <div style={{lineHeight: "1.1"}}>
-                        <h6 className="m-0 fw-bold text-primary">{project.name}</h6>
-                        <small className="text-muted" style={{fontSize: "0.7rem"}}>Project {project.id} Task Manager</small>
+                        <h6 className="m-0 fw-bold text-primary">Project {project.id}</h6>
+                        <small className="text-muted" style={{fontSize: "0.7rem"}}>Task Manager</small>
                     </div>
                 </div>
                 <Button variant="primary" size="sm" onClick={openAddModal}>
@@ -330,7 +274,6 @@ const ProjectTasks = ({ project, onBack }) => {
                 </Button>
             </div>
 
-            {/* TASK LIST */}
             {isLoading ? (
                 <div className="text-center py-5"><Spinner animation="border" size="sm" variant="primary" /></div>
             ) : tasks.length === 0 ? (
@@ -342,10 +285,7 @@ const ProjectTasks = ({ project, onBack }) => {
                 <div style={{ maxHeight: "calc(100vh - 220px)", overflowY: "auto", paddingRight: "4px" }}>
                     {tasks.map((t, idx) => (
                         <Card key={idx} className="mb-2 shadow-sm border-0" 
-                              style={{ 
-                                  marginLeft: `${t.depth * 24}px`, 
-                                  borderLeft: t.depth > 0 ? "3px solid #e9ecef" : "none" 
-                              }}>
+                              style={{ marginLeft: `${t.depth * 24}px`, borderLeft: t.depth > 0 ? "3px solid #e9ecef" : "none" }}>
                             <Card.Body className="p-2">
                                 <div className="d-flex justify-content-between align-items-start">
                                     <div className="d-flex align-items-center" style={{overflow: "hidden"}}>
@@ -359,14 +299,11 @@ const ProjectTasks = ({ project, onBack }) => {
                                         <Button variant="light" className="px-2 text-primary" onClick={() => handleJump(t.rowIndex)} title="Locate">
                                             <i className="fas fa-location-arrow" style={{fontSize: "0.7rem"}}></i>
                                         </Button>
-                                        
-                                        {/* Add Sub-Task (Only if depth < 2) */}
                                         {t.depth < 2 && (
                                             <Button variant="light" className="px-2 text-success" onClick={() => openSubTaskModal(t)} title="Add Sub-Task">
                                                 <i className="fas fa-plus" style={{fontSize: "0.7rem"}}></i>
                                             </Button>
                                         )}
-
                                         <Button variant="light" className="px-2 text-secondary" onClick={() => openEditModal(t)} title="Edit">
                                             <i className="fas fa-pencil" style={{fontSize: "0.7rem"}}></i>
                                         </Button>
@@ -400,7 +337,6 @@ const ProjectTasks = ({ project, onBack }) => {
                 </div>
             )}
 
-            {/* FORM MODAL (ADD / EDIT) */}
             <Modal show={showForm} onHide={() => setShowForm(false)} centered>
                 <Modal.Header closeButton className="py-2 bg-light">
                     <Modal.Title style={{fontSize: "1rem"}}>
@@ -468,7 +404,6 @@ const ProjectTasks = ({ project, onBack }) => {
                 </Modal.Footer>
             </Modal>
 
-            {/* DELETE CONFIRMATION MODAL */}
             <Modal show={showDelete} onHide={() => setShowDelete(false)} centered size="sm">
                 <Modal.Header closeButton className="py-2 bg-light">
                     <Modal.Title style={{fontSize: "1rem"}} className="fw-bold text-danger">Delete Task?</Modal.Title>
