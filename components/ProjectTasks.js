@@ -78,7 +78,6 @@ const ProjectTasks = ({ project, onBack }) => {
                         const dotCount = (idStr.match(/\./g) || []).length;
                         const depth = Math.max(0, dotCount - 1);
                         
-                        // Remove leading arrows/spaces
                         const cleanName = row[1].toString().replace(/^[↑\s]+/, '');
 
                         projectTasks.push({
@@ -140,7 +139,7 @@ const ProjectTasks = ({ project, onBack }) => {
         setShowForm(true);
     };
 
-    // --- 3. SAVE LOGIC ---
+    // --- 3. SAVE LOGIC (WITH GANTT LOGIC TRIGGER) ---
     const handleSave = async () => {
         if (!formData.name) {
             setStatus("Task Name is required.");
@@ -215,6 +214,11 @@ const ProjectTasks = ({ project, onBack }) => {
                     newRow.select();
                 }
 
+                // --- TRIGGER LOGIC ENGINE ---
+                if (window.GanttLogic) {
+                    await window.GanttLogic.updateProjectAverages(context);
+                }
+
                 await context.sync();
                 setShowForm(false);
                 fetchTasks();
@@ -225,7 +229,7 @@ const ProjectTasks = ({ project, onBack }) => {
         }
     };
 
-    // --- 4. DELETE LOGIC ---
+    // --- 4. DELETE LOGIC (WITH GANTT LOGIC TRIGGER) ---
     const handleDelete = async () => {
         if (!activeTask) return;
         try {
@@ -233,6 +237,12 @@ const ProjectTasks = ({ project, onBack }) => {
                 const sheet = context.workbook.worksheets.getItem("GanttChart");
                 const range = sheet.getRangeByIndexes(activeTask.rowIndex, 0, 1, 1).getEntireRow();
                 range.delete(Excel.DeleteShiftDirection.up);
+                
+                // --- TRIGGER LOGIC ENGINE ---
+                if (window.GanttLogic) {
+                    await window.GanttLogic.updateProjectAverages(context);
+                }
+
                 await context.sync();
                 setShowDelete(false);
                 setActiveTask(null);
@@ -319,8 +329,6 @@ const ProjectTasks = ({ project, onBack }) => {
                                             {t.percent || "0%"}
                                         </Badge>
                                     </div>
-                                    
-                                    {/* UPDATED DATE ROW MATCHING PROJECT LIST STYLE */}
                                     <div className="d-flex justify-content-between border-top pt-1 mt-1 px-1">
                                         <span className="d-flex align-items-center">
                                             <i className="fas fa-calendar-days me-2 text-secondary" style={{width: "14px", textAlign: "center"}}></i>
@@ -333,7 +341,6 @@ const ProjectTasks = ({ project, onBack }) => {
                                             </>
                                         )}
                                     </div>
-
                                 </div>
                             </Card.Body>
                         </Card>

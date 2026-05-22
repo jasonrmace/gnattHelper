@@ -14,7 +14,7 @@ const ProjectList = window.ProjectList;
 
 function App() {
     // --- STATE ---
-    const [version] = useState("v4.2.0");
+    const [version] = useState("v4.2.2");
     const [activeTab, setActiveTab] = useState("ProjectList");
     
     // Validation State
