@@ -1,0 +1,11 @@
+# Local Development Certificates (Security Risk if committed)
+cert.pem
+key.pem
+
+# Local Dev Manifest
+manifest-local.xml
+
+# Standard Node.js ignores (Recommended)
+node_modules/
+.DS_Store
+Thumbs.db
