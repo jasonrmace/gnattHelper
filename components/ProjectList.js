@@ -24,7 +24,7 @@ const ProjectList = ({ refreshTrigger }) => {
         const calculateHeight = () => {
             if (listContainerRef.current) {
                 const topPosition = listContainerRef.current.getBoundingClientRect().top;
-                const availableHeight = window.innerHeight - topPosition - 20;
+                const availableHeight = window.innerHeight - topPosition - 20 - 34;
                 setListHeight(`${availableHeight}px`);
             }
         };
