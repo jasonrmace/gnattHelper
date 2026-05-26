@@ -1,13 +1,16 @@
 <!DOCTYPE html>
 <html>
+
 <head>
     <meta charset="UTF-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Gantt Project Manager</title>
 
-    <!-- 1. BOOTSTRAP CSS (Keep this!) -->
+    <!-- 1. BOOTSTRAP CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- FONT AWESOME -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
     <!-- 2. OFFICE.JS -->
     <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js" type="text/javascript"></script>
@@ -17,42 +20,38 @@
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-    <!-- 4. REACT BOOTSTRAP (The New Library) -->
+    <!-- 4. REACT BOOTSTRAP -->
     <script src="https://cdn.jsdelivr.net/npm/react-bootstrap@2.10.2/dist/react-bootstrap.min.js"></script>
 
-    <!-- Add this to taskpane.html -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-
-    <!-- LOGIC ENGINES -->
+    <!-- 5. LOGIC ENGINES (Standard JS) -->
     <script type="text/javascript" src="utils/ganttLogic.js"></script>
     <script type="text/javascript" src="utils/visualLogic.js"></script>
-    <!-- <script type="text/javascript" src="./utils/formattingLogic.js?v=1"></script> -->
     <script type="text/javascript" src="./utils/formattingLogic_v2.js"></script>
     <script type="text/javascript" src="./utils/eventListeners.js"></script>
+    <script type="text/javascript" src="./utils/identityLogic.js"></script>
 
-    <!-- CHILD LOGIC -->
+    <!-- 6. CHILD COMPONENTS (Babel/JSX) -->
+     <script type="text/babel" src="./components/IdentityModal.js"></script>
+    <script type="text/babel" src="./components/SettingsPage.js"></script>
     <script type="text/babel" src="components/CreateProject.js"></script>
     <script type="text/babel" src="components/MainNavbar.js"></script>
     <script type="text/babel" src="components/ProjectTasks.js"></script>
     <script type="text/babel" src="components/ProjectList.js"></script>
 
-    <!-- 6. YOUR LOGIC -->
-    <script type="text/babel" src="taskpane.js"></script>
-
     <style>
-        body { background-color: #f8f9fa; }
-        /* Optional: Add custom styles here if needed */
+        body {
+            background-color: #f8f9fa;
+        }
     </style>
 </head>
-<body>
 
+<body>
     <!-- THE ROOT CONTAINER -->
     <div id="root"></div>
 
-    <!-- 4. LOAD YOUR LOGIC 
-         Notice type="text/babel". This is crucial for React. 
-    -->
+    <!-- 7. MAIN APP ENTRY POINT -->
+    <!-- MUST be at the bottom so 'root' exists when it runs -->
     <script type="text/babel" src="taskpane.js"></script>
-
 </body>
+
 </html>

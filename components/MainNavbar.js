@@ -22,6 +22,7 @@ const MainNavbar = ({ activeTab, setActiveTab, isFileValid }) => {
         if (isSyncing) return;
         setIsSyncing(true);
         try {
+            if (window.GlobalLoader) window.GlobalLoader.show("Syncing Visuals...");
             await Excel.run(async (context) => {
                 if (window.VisualLogic) {
                     await window.VisualLogic.refreshGridAlerts(context);
@@ -31,6 +32,7 @@ const MainNavbar = ({ activeTab, setActiveTab, isFileValid }) => {
         } catch (e) {
             console.error(e);
         } finally {
+            if (window.GlobalLoader) window.GlobalLoader.hide();
             setIsSyncing(false);
             setExpanded(false);
         }
@@ -41,6 +43,7 @@ const MainNavbar = ({ activeTab, setActiveTab, isFileValid }) => {
         if (isSyncing) return;
         setIsSyncing(true);
         try {
+            if (window.GlobalLoader) window.GlobalLoader.show("Resetting Rules...");
             await Excel.run(async (context) => {
                 if (window.FormattingLogic) {
                     await window.FormattingLogic.generateSmartRules(context);
@@ -50,6 +53,7 @@ const MainNavbar = ({ activeTab, setActiveTab, isFileValid }) => {
         } catch (e) {
             console.error(e);
         } finally {
+            if (window.GlobalLoader) window.GlobalLoader.hide();
             setIsSyncing(false);
             setExpanded(false);
         }
@@ -59,14 +63,14 @@ const MainNavbar = ({ activeTab, setActiveTab, isFileValid }) => {
         <Navbar 
             expand="lg" 
             bg="dark" 
-            // Added flex-shrink-0 to ensure stability in the new layout
-            className="p-3 navbar-dark flex-shrink-0" 
+            className="p-3 navbar-dark flex-shrink-0"
             activeKey={activeTab} 
-            expanded={expanded}
+            expanded={expanded} 
             onToggle={() => handleLayoutChange(!expanded)}
             onSelect={(selectedKey) => {
-                setActiveTab(selectedKey);
-                handleLayoutChange(false); 
+                // Only switch tabs if it's a valid eventKey (not undefined)
+                if (selectedKey) setActiveTab(selectedKey);
+                handleLayoutChange(false);
             }}
         >
             <Navbar.Brand style={{cursor: "default"}}>
@@ -77,12 +81,9 @@ const MainNavbar = ({ activeTab, setActiveTab, isFileValid }) => {
                     style={{width: "132px"}} 
                 />
             </Navbar.Brand>
-            
             <Navbar.Toggle aria-controls="basic-navbar-nav" />
-            
             <Navbar.Collapse id="basic-navbar-nav">
                 <Nav className="me-auto">
-                    
                     {isFileValid ? (
                         <>
                             <Nav.Link eventKey="ProjectList">Active Projects</Nav.Link>
@@ -91,16 +92,24 @@ const MainNavbar = ({ activeTab, setActiveTab, isFileValid }) => {
                             <NavDropdown title="Options" id="basic-nav-dropdown">
                                 {/* ACTION 1: GRID ALERTS */}
                                 <NavDropdown.Item onClick={handleRefreshVisuals} disabled={isSyncing}>
-                                    <i className="fas fa-bell me-2 text-muted"></i>
+                                    <i className="fas fa-bell me-2 text-muted"></i> 
                                     {isSyncing ? "Syncing..." : "Refresh Grid Alerts"}
                                 </NavDropdown.Item>
 
-                                {/* ACTION 2: FORMATTING (New) */}
+                                {/* ACTION 2: FORMATTING */}
                                 <NavDropdown.Item onClick={handleResetFormatting} disabled={isSyncing}>
-                                    <i className="fas fa-paint-roller me-2 text-muted"></i>
+                                    <i className="fas fa-paint-roller me-2 text-muted"></i> 
                                     Reset Formatting Rules
                                 </NavDropdown.Item>
                                 
+                                <NavDropdown.Divider />
+                                
+                                {/* NAVIGATION: SETTINGS PAGE */}
+                                <NavDropdown.Item eventKey="Settings">
+                                    <i className="fas fa-user-cog me-2 text-muted"></i>
+                                    User Settings
+                                </NavDropdown.Item>
+
                                 <NavDropdown.Divider />
                                 <NavDropdown.Item href="#action/3.1">Export CSV</NavDropdown.Item>
                                 <NavDropdown.Item href="#action/3.2">Print View</NavDropdown.Item>
@@ -108,10 +117,9 @@ const MainNavbar = ({ activeTab, setActiveTab, isFileValid }) => {
                         </>
                     ) : (
                         <Nav.Item className="text-muted small pt-2 fst-italic">
-                           Functions Disabled
+                            Functions Disabled
                         </Nav.Item>
                     )}
-
                 </Nav>
             </Navbar.Collapse>
         </Navbar>

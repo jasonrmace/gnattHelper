@@ -5,23 +5,14 @@ const { Button, Card, Badge, Spinner, Modal, ButtonGroup, Form, Row, Col, Alert 
 
 const ProjectTasks = ({ project, onBack }) => {
     const [tasks, setTasks] = useState([]);
-    const [teamMembers, setTeamMembers] = useState([]);
+    const [teamMembers, setTeamMembers] = useState([]); // Stores { first, full }
     const [isLoading, setIsLoading] = useState(false);
-
     const [showDelete, setShowDelete] = useState(false);
     const [showForm, setShowForm] = useState(false);
-    
     const [activeTask, setActiveTask] = useState(null);
-    const [parentTask, setParentTask] = useState(null); 
+    const [parentTask, setParentTask] = useState(null);
     const [formMode, setFormMode] = useState("add");
-    
-    const [formData, setFormData] = useState({
-        name: "",
-        lead: "",
-        start: "",
-        end: "",
-        percent: "0%"
-    });
+    const [formData, setFormData] = useState({ name: "", lead: "", start: "", end: "", percent: "0%" });
     const [status, setStatus] = useState("");
 
     // --- 1. INITIAL LOADING ---
@@ -30,19 +21,29 @@ const ProjectTasks = ({ project, onBack }) => {
             try {
                 await Excel.run(async (context) => {
                     const sheet = context.workbook.worksheets.getItem("Team");
-                    const range = sheet.getUsedRange();
+                    const range = sheet.getUsedRange(); 
+                    // Assuming Team Table: Col A = First Name, Col B = Last Name
                     range.load("text");
                     await context.sync();
+                    
                     const rows = range.text;
                     const members = [];
+                    // Start at i=1 to skip header
                     for (let i = 1; i < rows.length; i++) {
                         const first = rows[i][0]?.trim();
                         const last = rows[i][1]?.trim();
-                        if (first) members.push({ first, full: `${first} ${last}` });
+                        if (first) {
+                            members.push({ 
+                                first: first, 
+                                full: last ? `${first} ${last}` : first 
+                            });
+                        }
                     }
                     setTeamMembers(members);
                 });
-            } catch (e) { console.error("Team load error", e); }
+            } catch (e) {
+                console.error("Team load error", e);
+            }
         };
         fetchTeam();
     }, []);
@@ -56,9 +57,9 @@ const ProjectTasks = ({ project, onBack }) => {
                 footerRange.load("rowIndex");
                 await context.sync();
 
-                const dataStartIndex = 7;
+                const dataStartIndex = 7; 
                 const rowCount = footerRange.rowIndex - dataStartIndex;
-                
+
                 if (rowCount <= 0) {
                     setTasks([]);
                     return;
@@ -70,21 +71,22 @@ const ProjectTasks = ({ project, onBack }) => {
 
                 const rawRows = range.text;
                 const projectTasks = [];
-                const parentIdPrefix = `${project.id}.`; 
+                const parentIdPrefix = `${project.id}.`;
 
                 rawRows.forEach((row, index) => {
                     const idStr = row[0].toString();
+                    
+                    // Check if it belongs to this project (e.g. "4.1", "4.2") but IS NOT the header "4"
                     if (idStr.startsWith(parentIdPrefix) && idStr !== project.id.toString()) {
                         const dotCount = (idStr.match(/\./g) || []).length;
-                        const depth = Math.max(0, dotCount - 1);
-                        
+                        const depth = Math.max(0, dotCount - 1); // Indentation level
                         const cleanName = row[1].toString().replace(/^[↑\s]+/, '');
 
                         projectTasks.push({
                             id: idStr,
                             rowIndex: dataStartIndex + index,
                             name: cleanName,
-                            lead: row[2],
+                            lead: row[2], // This is usually just First Name
                             start: row[4],
                             end: row[5],
                             percent: row[7],
@@ -101,7 +103,9 @@ const ProjectTasks = ({ project, onBack }) => {
         }
     };
 
-    useEffect(() => { fetchTasks(); }, [project]);
+    useEffect(() => {
+        fetchTasks();
+    }, [project]);
 
     // --- 2. ACTIONS ---
     const openAddModal = () => {
@@ -154,9 +158,9 @@ const ProjectTasks = ({ project, onBack }) => {
                 if (formMode === "edit") {
                     const rowIndex = activeTask.rowIndex;
                     sheet.getCell(rowIndex, 1).values = [[formData.name]];
-                    if (formData.lead) sheet.getCell(rowIndex, 2).values = [[formData.lead]];
+                    if (formData.lead) sheet.getCell(rowIndex, 2).values = [[formData.lead]]; // Saves First Name
                     if (formData.start) sheet.getCell(rowIndex, 4).values = [[formData.start]];
-
+                    
                     if (formData.start && formData.end) {
                         const s = new Date(formData.start);
                         const e = new Date(formData.end);
@@ -164,9 +168,9 @@ const ProjectTasks = ({ project, onBack }) => {
                         sheet.getCell(rowIndex, 6).values = [[diff]];
                     }
                     sheet.getCell(rowIndex, 7).values = [[formData.percent]];
-                } 
-                else {
-                    let templateName = "Level2Task"; 
+                } else {
+                    // ADD NEW TASK LOGIC
+                    let templateName = "Level2Task";
                     let insertRowIndex = -1;
 
                     if (formMode === "sub" && parentTask) {
@@ -183,20 +187,21 @@ const ProjectTasks = ({ project, onBack }) => {
                     }
 
                     let namedItem = sheet.names.getItemOrNullObject(templateName);
-                    namedItem.load("isNullObject"); 
+                    namedItem.load("isNullObject");
                     await context.sync();
 
                     if (namedItem.isNullObject) {
-                        namedItem = context.workbook.names.getItemOrNullObject(templateName);
-                        namedItem.load("isNullObject"); 
-                        await context.sync();
+                         namedItem = context.workbook.names.getItemOrNullObject(templateName);
+                         namedItem.load("isNullObject");
+                         await context.sync();
                     }
-                    
+
                     if (namedItem.isNullObject) throw new Error(`Template '${templateName}' not found.`);
-                    
+
                     const sourceRow = namedItem.getRange().getEntireRow();
                     const insertRange = sheet.getRange(`${insertRowIndex + 1}:${insertRowIndex + 1}`);
                     insertRange.insert(Excel.InsertShiftDirection.down);
+
                     const newRow = sheet.getRange(`${insertRowIndex + 1}:${insertRowIndex + 1}`);
                     newRow.copyFrom(sourceRow, Excel.RangeCopyType.all);
 
@@ -210,7 +215,6 @@ const ProjectTasks = ({ project, onBack }) => {
                         const diff = Math.ceil(Math.abs(e - s) / (1000 * 60 * 60 * 24)) + 1;
                         sheet.getCell(insertRowIndex, 6).values = [[diff]];
                     }
-                    
                     newRow.select();
                 }
 
@@ -218,8 +222,8 @@ const ProjectTasks = ({ project, onBack }) => {
                 if (window.GanttLogic) {
                     await window.GanttLogic.updateProjectAverages(context);
                 }
-
                 await context.sync();
+                
                 setShowForm(false);
                 fetchTasks();
             });
@@ -237,18 +241,20 @@ const ProjectTasks = ({ project, onBack }) => {
                 const sheet = context.workbook.worksheets.getItem("GanttChart");
                 const range = sheet.getRangeByIndexes(activeTask.rowIndex, 0, 1, 1).getEntireRow();
                 range.delete(Excel.DeleteShiftDirection.up);
-                
+
                 // --- TRIGGER LOGIC ENGINE ---
                 if (window.GanttLogic) {
                     await window.GanttLogic.updateProjectAverages(context);
                 }
-
                 await context.sync();
+                
                 setShowDelete(false);
                 setActiveTask(null);
                 fetchTasks();
             });
-        } catch (error) { console.error(error); }
+        } catch (error) {
+            console.error(error);
+        }
     };
 
     const handleJump = async (rowIndex) => {
@@ -260,11 +266,14 @@ const ProjectTasks = ({ project, onBack }) => {
                 range.select();
                 await context.sync();
             });
-        } catch (error) { console.error(error); }
+        } catch (error) {
+            console.error(error);
+        }
     };
 
     return (
         <div className="mt-4">
+            {/* HEADER */}
             <div className="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom">
                 <div className="d-flex align-items-center">
                     <Button variant="light" size="sm" className="me-2 text-muted" onClick={onBack} title="Back">
@@ -280,6 +289,7 @@ const ProjectTasks = ({ project, onBack }) => {
                 </Button>
             </div>
 
+            {/* TASK LIST */}
             {isLoading ? (
                 <div className="text-center py-5"><Spinner animation="border" size="sm" variant="primary" /></div>
             ) : tasks.length === 0 ? (
@@ -290,9 +300,9 @@ const ProjectTasks = ({ project, onBack }) => {
             ) : (
                 <div style={{ maxHeight: "calc(100vh - 220px)", overflowY: "auto", paddingRight: "4px" }}>
                     {tasks.map((t, idx) => (
-                        <Card key={idx} className="mb-2 shadow-sm border-0" 
-                              style={{ marginLeft: `${t.depth * 24}px`, borderLeft: t.depth > 0 ? "3px solid #e9ecef" : "none" }}>
+                        <Card key={idx} className="mb-2 shadow-sm border-0" style={{ marginLeft: `${t.depth * 24}px`, borderLeft: t.depth > 0 ? "3px solid #e9ecef" : "none" }}>
                             <Card.Body className="p-2">
+                                {/* TOP ROW: ID, NAME, BUTTONS */}
                                 <div className="d-flex justify-content-between align-items-start">
                                     <div className="d-flex align-items-center" style={{overflow: "hidden"}}>
                                         <Badge bg="secondary" className="me-2" style={{fontSize: "0.65rem", minWidth: "35px"}}>{t.id}</Badge>
@@ -300,7 +310,6 @@ const ProjectTasks = ({ project, onBack }) => {
                                             {t.name}
                                         </span>
                                     </div>
-                                    
                                     <ButtonGroup size="sm" className="ms-2 flex-shrink-0">
                                         <Button variant="light" className="px-2 text-primary" onClick={() => handleJump(t.rowIndex)} title="Locate">
                                             <i className="fas fa-location-arrow" style={{fontSize: "0.7rem"}}></i>
@@ -319,11 +328,20 @@ const ProjectTasks = ({ project, onBack }) => {
                                     </ButtonGroup>
                                 </div>
 
+                                {/* BOTTOM ROW: LEAD (UPDATED), BADGE, DATES */}
                                 <div className="mt-2 small text-muted">
                                     <div className="d-flex justify-content-between mb-1 align-items-center">
                                         <span className="d-flex align-items-center">
-                                            <i className="fas fa-user me-2 text-secondary opacity-50" style={{width: "14px"}}></i> 
-                                            {t.lead || "-"}
+                                            <i className="fas fa-user me-2 text-secondary opacity-50" style={{width: "14px"}}></i>
+                                            
+                                            {/* --- UPDATE: FULL NAME LOOKUP --- */}
+                                            {(() => {
+                                                if (!t.lead) return "-";
+                                                // Find match in teamMembers list
+                                                const member = teamMembers.find(m => m.first === t.lead);
+                                                return member ? member.full : t.lead;
+                                            })()}
+
                                         </span>
                                         <Badge bg={t.percent === "100%" ? "success" : "light"} text={t.percent === "100%" ? "white" : "dark"} className="border fw-normal">
                                             {t.percent || "0%"}
@@ -348,6 +366,7 @@ const ProjectTasks = ({ project, onBack }) => {
                 </div>
             )}
 
+            {/* MODALS */}
             <Modal show={showForm} onHide={() => setShowForm(false)} centered>
                 <Modal.Header closeButton className="py-2 bg-light">
                     <Modal.Title style={{fontSize: "1rem"}}>
@@ -360,18 +379,16 @@ const ProjectTasks = ({ project, onBack }) => {
                             Adding under: <strong>{parentTask.name}</strong> ({parentTask.id})
                         </Alert>
                     )}
-                    
                     <Form.Group className="mb-2">
                         <Form.Label className="small fw-bold text-muted">TASK NAME</Form.Label>
-                        <Form.Control size="sm" type="text" value={formData.name} 
-                             onChange={(e) => setFormData({...formData, name: e.target.value})} />
+                        <Form.Control size="sm" type="text" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} />
                     </Form.Group>
-
+                    
                     <Form.Group className="mb-2">
                         <Form.Label className="small fw-bold text-muted">ASSIGN LEAD</Form.Label>
-                        <Form.Select size="sm" value={formData.lead} 
-                            onChange={(e) => setFormData({...formData, lead: e.target.value})}>
+                        <Form.Select size="sm" value={formData.lead} onChange={(e) => setFormData({...formData, lead: e.target.value})}>
                             <option value="">Unassigned</option>
+                            {/* Use First Name for Value, Full Name for Display */}
                             {teamMembers.map((m, i) => <option key={i} value={m.first}>{m.full}</option>)}
                         </Form.Select>
                     </Form.Group>
@@ -380,24 +397,21 @@ const ProjectTasks = ({ project, onBack }) => {
                         <Col xs={6}>
                             <Form.Group>
                                 <Form.Label className="small fw-bold text-muted">START</Form.Label>
-                                <Form.Control size="sm" type="date" value={formData.start} 
-                                    onChange={(e) => setFormData({...formData, start: e.target.value})} />
+                                <Form.Control size="sm" type="date" value={formData.start} onChange={(e) => setFormData({...formData, start: e.target.value})} />
                             </Form.Group>
                         </Col>
                         <Col xs={6}>
                             <Form.Group>
                                 <Form.Label className="small fw-bold text-muted">END (EST)</Form.Label>
-                                <Form.Control size="sm" type="date" value={formData.end} 
-                                    onChange={(e) => setFormData({...formData, end: e.target.value})} />
+                                <Form.Control size="sm" type="date" value={formData.end} onChange={(e) => setFormData({...formData, end: e.target.value})} />
                             </Form.Group>
                         </Col>
                     </Row>
-                    
+
                     {formMode === "edit" && (
                         <Form.Group className="mb-2">
                             <Form.Label className="small fw-bold text-muted">% COMPLETE</Form.Label>
-                            <Form.Select size="sm" value={formData.percent} 
-                                onChange={(e) => setFormData({...formData, percent: e.target.value})}>
+                            <Form.Select size="sm" value={formData.percent} onChange={(e) => setFormData({...formData, percent: e.target.value})}>
                                 <option value="0%">0%</option>
                                 <option value="25%">25%</option>
                                 <option value="50%">50%</option>

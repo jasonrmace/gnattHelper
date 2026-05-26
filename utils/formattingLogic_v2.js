@@ -1,13 +1,14 @@
 /* global Excel */
 
 // ==============================================================================
-// FORMATTING LOGIC ENGINE (Phase 14: Priority Swap)
+// FORMATTING LOGIC ENGINE (Phase 17: Project Row Protection)
 // Replaces VBA 'GenerateSmartRules'
 //
 // CHANGES:
-// - Swapped Block F (PTO) and Block G (Holidays).
-// - Now Applies Holidays FIRST (Step 8), then PTO LAST (Step 9).
-// - Result: PTO Rule sits "On Top" of Holidays in the priority stack.
+// 1. Block C (Team Colors): Added 'ISNUMBER(SEARCH(".", $A8))' to BOTH rules.
+//    - Name Cell (Col C): Only colors if ID has a dot (Task).
+//    - Grid Bar (Col K): Only colors if ID has a dot (Task).
+//    - Project Rows (Whole Numbers): Ignored by Block C, caught by Block E (Grey).
 // ==============================================================================
 
 window.FormattingLogic = {
@@ -134,20 +135,21 @@ window.FormattingLogic = {
             await context.sync();
             console.log(">> Today Borders Applied.");
 
-            // --- BLOCK C: TEAM COLORS ---
+            // --- BLOCK C: TEAM COLORS (PROJECT PROTECTED) ---
             console.log("STEP 5: Applying Team Colors...");
             for (let member of teamRules) {
                 const safeName = member.name.replace(/"/g, '""');
                 
-                // Name Cell
+                // 1. NAME CELL (Strict Task Only)
+                // Added: ISNUMBER(SEARCH(".", $A8)) -> Only applies if ID has a dot.
                 const fName = namesRange.conditionalFormats.add(Excel.ConditionalFormatType.custom);
-                fName.custom.rule.formula = `=UPPER(TRIM($C8))="${safeName}"`;
+                fName.custom.rule.formula = `=AND(UPPER(TRIM($C8))="${safeName}", ISNUMBER(SEARCH(".", $A8)))`;
                 fName.custom.format.fill.color = member.color;
                 fName.stopIfTrue = true;
 
-                // Grid Bar (Base Color)
+                // 2. GRID BAR (Strict Task Only)
                 const fBar = gridRange.conditionalFormats.add(Excel.ConditionalFormatType.custom);
-                fBar.custom.rule.formula = `=AND(ISNUMBER($E8), K$6>=$E8, K$6<=$F8, UPPER(TRIM($C8))="${safeName}")`;
+                fBar.custom.rule.formula = `=AND(ISNUMBER($E8), K$6>=$E8, K$6<=$F8, UPPER(TRIM($C8))="${safeName}", ISNUMBER(SEARCH(".", $A8)))`;
                 fBar.custom.format.fill.color = member.color;
                 fBar.stopIfTrue = true; 
             }

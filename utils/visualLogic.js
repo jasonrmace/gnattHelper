@@ -1,19 +1,17 @@
 /* global Excel */
 
 // ==============================================================================
-// VISUAL LOGIC ENGINE (Phase 8: In-Cell Counters)
+// VISUAL LOGIC ENGINE (Phase 10: English Grammar Fix)
 // Purpose: Applies Data Validation (Popups) AND In-Cell Counters.
 // 
 // CHANGE LOG:
-// 1. Removed Row 7 writing.
-// 2. Now writes the PTO Count (if >= 2) into EVERY cell of the column.
-// 3. formatting: Superscript, Center Aligned, Dark Grey (Not Red).
+// 1. Formatting: Now uses "&" for the last name (e.g., "A, B & C are on PTO").
 // ==============================================================================
 
 window.VisualLogic = {
     refreshGridAlerts: async (context) => {
-        console.log("Visual Logic: Starting Grid Refresh (Phase 8 - In-Cell)...");
-
+        console.log("Visual Logic: Starting Grid Refresh (Phase 10 - Grammar)...");
+        
         // 1. SHOW SPINNER
         if (window.GlobalLoader) window.GlobalLoader.show("Syncing Visuals...");
 
@@ -117,7 +115,16 @@ window.VisualLogic = {
                             title = "PTO Alert";
                             ptoCount = ptoNames.length;
                             const suffix = ptoCount === 1 ? " is on PTO." : " are on PTO.";
-                            message = ptoNames.join(", ") + suffix;
+                            
+                            // --- GRAMMAR FIX ---
+                            if (ptoCount === 1) {
+                                message = ptoNames[0] + suffix;
+                            } else if (ptoCount === 2) {
+                                message = `${ptoNames[0]} & ${ptoNames[1]}` + suffix;
+                            } else {
+                                const last = ptoNames.pop(); // Remove last name
+                                message = `${ptoNames.join(", ")} & ${last}` + suffix;
+                            }
                         }
                     }
 
@@ -136,29 +143,27 @@ window.VisualLogic = {
                     }
 
                     // B. Apply In-Cell Counter (Superscript)
-                    // If Count >= 2, we fill the WHOLE column with the number. Else clear it.
                     let cellValue = "";
                     if (ptoCount >= 2) {
                         cellValue = ptoCount;
                     }
 
-                    // Create a vertical array of the same value [ ["2"], ["2"], ... ]
-                    // This is much faster than writing cell-by-cell
-                    const columnValues = new Array(rowCount).fill([cellValue]);
-                    colStrip.values = columnValues;
-
-                    // Apply Formatting to make it subtle
-                    if (cellValue !== "") {
+                    if (ptoCount >= 2) {
+                        // 2+ People: Write the Number
+                        const columnValues = new Array(rowCount).fill([ptoCount]);
+                        colStrip.values = columnValues;
+                        
+                        // Format: Center, Dark Grey, Superscript
                         colStrip.format.font.superscript = true;
                         colStrip.format.horizontalAlignment = "Center";
-                        colStrip.format.font.color = "#444444"; // Dark Grey (Not Red)
+                        colStrip.format.font.color = "#444444"; 
                     } else {
-                        // Clear formatting if empty to keep grid clean
-                        colStrip.format.font.superscript = false;
+                        // 0 or 1 Person: Clear the cell contents
+                        colStrip.clear(Excel.ClearApplyTo.contents);
                     }
                 }
 
-                // Sync every 50 columns to prevent timeout
+                // Sync every 50 columns
                 if (c % 50 === 0) await context.sync();
             }
 

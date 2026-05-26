@@ -9,6 +9,8 @@ const { Container, Alert, Spinner } = ReactBootstrap || {};
 const MainNavbar = window.MainNavbar;
 const CreateProject = window.CreateProject;
 const ProjectList = window.ProjectList;
+const SettingsPage = window.SettingsPage;
+const IdentityModal = window.IdentityModal;
 
 // --- GLOBAL LOADING OVERLAY ---
 const LoadingOverlay = ({ isVisible, message }) => {
@@ -31,15 +33,16 @@ const LoadingOverlay = ({ isVisible, message }) => {
 
 function App() {
     // --- STATE ---
-    const [version] = useState("v4.4.1");
+    const [version] = useState("v4.6.3"); 
     const [activeTab, setActiveTab] = useState("ProjectList");
     const [isValidFile, setIsValidFile] = useState(true);
     const [currentName, setCurrentName] = useState("");
     const [hudText, setHudText] = useState("Ready");
     
-    // LOADER STATE
+    // LOADER & MODAL STATE
     const [isLoading, setIsLoading] = useState(false);
     const [loadingMsg, setLoadingMsg] = useState("Processing...");
+    const [showIdentityModal, setShowIdentityModal] = useState(false);
     
     const processingRef = useRef(false);
 
@@ -73,15 +76,18 @@ function App() {
                     handleSelectionChange
                 );
 
-                // B. REGISTER WATCHDOG (Silent)
-                // This turns on the "Ears" but does NOT run the scripts yet.
-                // Scripts will only run when a 'SheetChanged' event fires.
+                // B. Register Watchdog
                 if (window.EventListeners) {
                     await window.EventListeners.register();
                 }
-                
-                // REMOVED: Section D (Initial Full Sync)
-                // The add-on now loads silently without touching the grid.
+
+                // C. CHECK IDENTITY
+                if (window.IdentityLogic) {
+                    const user = window.IdentityLogic.getIdentity();
+                    if (!user) {
+                        setShowIdentityModal(true);
+                    }
+                }
             }
         });
 
@@ -93,7 +99,7 @@ function App() {
         };
     }, []);
 
-    // --- HUD LOGIC (Unchanged) ---
+    // --- HUD LOGIC ---
     const handleSelectionChange = async () => {
         if (processingRef.current) return;
         processingRef.current = true;
@@ -110,8 +116,8 @@ function App() {
                 }
                 
                 const currentRowIndex = range.rowIndex;
-                const idCell = sheet.getRangeByIndexes(currentRowIndex, 0, 1, 1);
-                const nameCell = sheet.getRangeByIndexes(currentRowIndex, 1, 1, 1);
+                const idCell = sheet.getRangeByIndexes(currentRowIndex, 0, 1, 1);   
+                const nameCell = sheet.getRangeByIndexes(currentRowIndex, 1, 1, 1); 
                 idCell.load("text"); nameCell.load("text"); 
                 await context.sync();
 
@@ -121,24 +127,39 @@ function App() {
 
                 if (currentID) {
                     const idNum = parseFloat(currentID);
+                    
+                    // CASE 1: Integer (Project Header)
                     if (Number.isInteger(idNum)) {
                         finalText = `PROJECT ${currentID}: ${currentName}`;
-                    } else if (!isNaN(idNum)) {
-                        finalText = `PROJECT ${currentID}: Task`; 
+                    } 
+                    // CASE 2: Decimal (Task Row)
+                    else if (!isNaN(idNum)) {
+                        const parentID = Math.floor(idNum).toString();
+                        
+                        const foundRange = sheet.getRange("A:A").find(parentID, { 
+                            completeMatch: true, 
+                            matchCase: false 
+                        });
+                        
+                        const parentNameRange = foundRange.getOffsetRange(0, 1);
+                        parentNameRange.load("text");
+                        await context.sync();
+                        
+                        const pName = parentNameRange.text[0][0];
+                        finalText = `PROJECT ${parentID}: ${pName} - Task ${currentID}`;
                     }
                 }
                 setHudText(finalText);
                 
-                // Update Shape
                 const shape = sheet.shapes.getItem("TaskHUD");
-                shape.load("name"); // Check existence
+                shape.load("name"); 
                 await context.sync().then(() => {
                     shape.textFrame.textRange.text = finalText;
                     return context.sync();
                 }).catch(() => {});
             });
         } catch (error) {
-            console.error("HUD Error:", error);
+             // console.error("HUD Error:", error); 
         } finally {
             setTimeout(() => { processingRef.current = false; }, 200);
         }
@@ -150,6 +171,12 @@ function App() {
             
             {/* GLOBAL LOADER */}
             <LoadingOverlay isVisible={isLoading} message={loadingMsg} />
+
+            {/* IDENTITY MODAL */}
+            <IdentityModal 
+                show={showIdentityModal} 
+                onHide={() => setShowIdentityModal(false)} 
+            />
 
             {/* 1. HEADER */}
             <div className="flex-shrink-0">
@@ -168,6 +195,7 @@ function App() {
                     <>
                         {activeTab === "ProjectList" && <ProjectList />}
                         {activeTab === "AddProject" && <CreateProject />}
+                        {activeTab === "Settings" && <SettingsPage />} 
                     </>
                 )}
             </div>
@@ -175,9 +203,16 @@ function App() {
             {/* 3. FOOTER */}
             <div className="bg-primary text-white shadow-lg px-3 py-2 d-flex justify-content-between align-items-center flex-shrink-0" 
                  style={{ fontSize: "0.8rem", borderTop: "3px solid #0d6efd", zIndex: 1030 }}>
-                <span className="fw-bold text-truncate" style={{maxWidth: "80%"}}>
+                
+                {/* ADDED: title={hudText} for hover support */}
+                <span 
+                    className="fw-bold text-truncate" 
+                    style={{maxWidth: "80%", cursor: "help"}} 
+                    title={hudText}
+                >
                     <i className="fas fa-crosshairs me-2 opacity-50"></i> {hudText}
                 </span>
+
                 <span className="opacity-50" style={{fontSize: "0.7rem"}}>{version}</span>
             </div>
         </div>
