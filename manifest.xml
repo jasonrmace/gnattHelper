@@ -1,26 +1,99 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<OfficeApp
-  xmlns="http://schemas.microsoft.com/office/appforoffice/1.1"
-  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+<OfficeApp 
+  xmlns="http://schemas.microsoft.com/office/appforoffice/1.1" 
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+  xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0" 
+  xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides" 
   xsi:type="TaskPaneApp">
 
-  <!-- 1. ID: Must be unique. I generated a random GUID for you. -->
+  <!-- 1. ID & VERSION -->
   <Id>c3a934c6-5412-4312-b532-986572134512</Id>
-  <Version>1.0.0.0</Version>
-  <ProviderName>My Team Tools</ProviderName>
+  <Version>4.1.9</Version>
+  <ProviderName>Jason Mace</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
-  <DisplayName DefaultValue="Project Helper" />
-  <Description DefaultValue="Adds projects to the Gantt Chart." />
+  
+  <!-- 2. NAMES & DESCRIPTION -->
+  <DisplayName DefaultValue="Barbizon Lighting Company - Excel Tools" />
+  <Description DefaultValue="Adds helpers to different excel files for Barbizon specific files." />
+  
+  <!-- 3. ICONS -->
+  <IconUrl DefaultValue="https://jasonrmace.github.io/gnattHelper/assets/logo-32.png" />
+  <HighResolutionIconUrl DefaultValue="https://jasonrmace.github.io/gnattHelper/assets/logo-80.png" />
 
+  <!-- 4. SUPPORT URL -->
+  <SupportUrl DefaultValue="https://jasonrmace.github.io/gnattHelper/help.html" />
+
+  <!-- 5. HOSTS (Legacy) -->
   <Hosts>
     <Host Name="Workbook" />
   </Hosts>
 
+  <!-- 6. DEFAULT SETTINGS (Legacy) -->
   <DefaultSettings>
-    <!-- 2. SOURCE LOCATION: Where is the HTML? -->
-    <!-- CHANGE THIS URL TO MATCH YOUR HOSTING -->
-    <SourceLocation DefaultValue="https://barbizon-my.sharepoint.com/:f:/p/jmace/IgDcRggjoBKOQLRNyCOHxavXAZ95pSdls5cqGELFvSGImi0?e=wXYaYQ/taskpane.html" />
+    <SourceLocation DefaultValue="https://jasonrmace.github.io/gnattHelper/taskpane.html" />
   </DefaultSettings>
 
+  <!-- 7. PERMISSIONS -->
   <Permissions>ReadWriteDocument</Permissions>
+
+  <!-- 8. VERSION OVERRIDES (Modern Ribbon UI) -->
+  <VersionOverrides xmlns="http://schemas.microsoft.com/office/taskpaneappversionoverrides" xsi:type="VersionOverridesV1_0">
+    
+    <!-- A. HOSTS (Define the Ribbon) -->
+    <Hosts>
+      <Host xsi:type="Workbook">
+        <DesktopFormFactor>
+          <ExtensionPoint xsi:type="PrimaryCommandSurface">
+            <OfficeTab id="TabHome">
+              <Group id="BarbizonGroup">
+                <Label resid="GroupLabel" />
+                <Icon>
+                  <bt:Image size="16" resid="Icon.16x16" />
+                  <bt:Image size="32" resid="Icon.32x32" />
+                  <bt:Image size="80" resid="Icon.80x80" />
+                </Icon>
+                <Control xsi:type="Button" id="TaskpaneButton">
+                  <Label resid="ButtonLabel" />
+                  <Supertip>
+                    <Title resid="Title" />
+                    <Description resid="Desc" />
+                  </Supertip>
+                  <Icon>
+                    <bt:Image size="16" resid="Icon.16x16" />
+                    <bt:Image size="32" resid="Icon.32x32" />
+                    <bt:Image size="80" resid="Icon.80x80" />
+                  </Icon>
+                  <Action xsi:type="ShowTaskpane">
+                    <TaskpaneId>BarbizonTaskpane</TaskpaneId>
+                    <SourceLocation resid="Taskpane.Url" />
+                  </Action>
+                </Control>
+              </Group>
+            </OfficeTab>
+          </ExtensionPoint>
+        </DesktopFormFactor>
+      </Host>
+    </Hosts>
+
+    <!-- B. RESOURCES (Must be INSIDE VersionOverrides, AFTER Hosts) -->
+    <Resources>
+      <bt:Images>
+        <bt:Image id="Icon.16x16" DefaultValue="https://jasonrmace.github.io/gnattHelper/assets/logo-16.png"/>
+        <bt:Image id="Icon.32x32" DefaultValue="https://jasonrmace.github.io/gnattHelper/assets/logo-32.png"/>
+        <bt:Image id="Icon.80x80" DefaultValue="https://jasonrmace.github.io/gnattHelper/assets/logo-80.png"/>
+      </bt:Images>
+      <bt:Urls>
+        <bt:Url id="Taskpane.Url" DefaultValue="https://jasonrmace.github.io/gnattHelper/taskpane.html" />
+      </bt:Urls>
+      <bt:ShortStrings>
+        <bt:String id="GroupLabel" DefaultValue="Barbizon Tools"/>
+        <bt:String id="ButtonLabel" DefaultValue="Excel Helpers"/>
+        <bt:String id="Title" DefaultValue="Barbizon Excel Tools"/>
+      </bt:ShortStrings>
+      <bt:LongStrings>
+        <bt:String id="Desc" DefaultValue="Opens the Barbizon Excel Tools sidebar."/>
+      </bt:LongStrings>
+    </Resources>
+
+  </VersionOverrides>
 </OfficeApp>
