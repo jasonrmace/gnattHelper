@@ -2,7 +2,6 @@
 
 // 1. CONFIGURATION
 const REQUIRED_FILENAME = "Houston Summer 2026 [Macros].xlsm";
-const EXPECTED_LOCATION = "";
 
 // 2. UNPACK LIBRARIES
 const { useState, useEffect, useRef } = React;
@@ -11,52 +10,78 @@ const MainNavbar = window.MainNavbar;
 const CreateProject = window.CreateProject;
 const ProjectList = window.ProjectList;
 
+// --- GLOBAL LOADING OVERLAY ---
+const LoadingOverlay = ({ isVisible, message }) => {
+    if (!isVisible) return null;
+    
+    return (
+        <div style={{
+            position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
+            backgroundColor: 'rgba(255, 255, 255, 0.9)', zIndex: 9999,
+            display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center'
+        }}>
+            <div className="text-primary mb-3">
+                <i className="fas fa-spinner fa-spin fa-3x"></i>
+            </div>
+            <h5 className="text-dark fw-bold">{message}</h5>
+            <p className="text-muted small">Please wait while Excel updates...</p>
+        </div>
+    );
+};
+
 function App() {
     // --- STATE ---
-    // UPDATED VERSION
-    const [version] = useState("v4.3.0"); 
+    const [version] = useState("v4.4.1");
     const [activeTab, setActiveTab] = useState("ProjectList");
     const [isValidFile, setIsValidFile] = useState(true);
     const [currentName, setCurrentName] = useState("");
     const [hudText, setHudText] = useState("Ready");
     
+    // LOADER STATE
+    const [isLoading, setIsLoading] = useState(false);
+    const [loadingMsg, setLoadingMsg] = useState("Processing...");
+    
     const processingRef = useRef(false);
 
-    // --- 1. INITIALIZATION & EVENTS ---
+    // --- EXPOSE LOADER TO WINDOW ---
+    useEffect(() => {
+        window.GlobalLoader = {
+            show: (msg = "Updating...") => {
+                setLoadingMsg(msg);
+                setIsLoading(true);
+            },
+            hide: () => {
+                setIsLoading(false);
+            }
+        };
+    }, []);
+
+    // --- INITIALIZATION & EVENTS ---
     useEffect(() => {
         Office.onReady(async (info) => {
             if (info.host === Office.HostType.Excel) {
                 console.log("Office Ready");
 
-                // A. File Validation
                 const url = Office.context.document.url;
                 const decodedUrl = decodeURI(url);
                 const segments = decodedUrl.split('/');
-                const fileName = segments[segments.length - 1];
-                setCurrentName(fileName);
+                setCurrentName(segments[segments.length - 1]);
 
-                if (!decodedUrl.includes(REQUIRED_FILENAME)) {
-                   // setIsValidFile(false); // Disabled for testing
-                }
-
-                // B. Register HUD Selection Listener
+                // A. Register HUD Selection Listener
                 Office.context.document.addHandlerAsync(
                     Office.EventType.DocumentSelectionChanged,
                     handleSelectionChange
                 );
 
-                // C. REGISTER WATCHDOG (UPDATED)
-                // This activates the listener on Team AND Vacation sheets
+                // B. REGISTER WATCHDOG (Silent)
+                // This turns on the "Ears" but does NOT run the scripts yet.
+                // Scripts will only run when a 'SheetChanged' event fires.
                 if (window.EventListeners) {
                     await window.EventListeners.register();
                 }
-
-                // D. INITIAL FULL SYNC (One time on load)
-                // We run BOTH engines to ensure bars and counters match immediately
-                await Excel.run(async (context) => {
-                    if (window.FormattingLogic) await window.FormattingLogic.generateSmartRules(context);
-                    if (window.VisualLogic) await window.VisualLogic.refreshGridAlerts(context);
-                });
+                
+                // REMOVED: Section D (Initial Full Sync)
+                // The add-on now loads silently without touching the grid.
             }
         });
 
@@ -68,11 +93,10 @@ function App() {
         };
     }, []);
 
-    // --- 2. HUD LOGIC ---
+    // --- HUD LOGIC (Unchanged) ---
     const handleSelectionChange = async () => {
         if (processingRef.current) return;
         processingRef.current = true;
-
         try {
             await Excel.run(async (context) => {
                 const sheet = context.workbook.worksheets.getActiveWorksheet();
@@ -84,13 +108,11 @@ function App() {
                     processingRef.current = false;
                     return;
                 }
-
+                
                 const currentRowIndex = range.rowIndex;
                 const idCell = sheet.getRangeByIndexes(currentRowIndex, 0, 1, 1);
                 const nameCell = sheet.getRangeByIndexes(currentRowIndex, 1, 1, 1);
-                
-                idCell.load("text");
-                nameCell.load("text");
+                idCell.load("text"); nameCell.load("text"); 
                 await context.sync();
 
                 const currentID = idCell.text[0][0];
@@ -102,20 +124,14 @@ function App() {
                     if (Number.isInteger(idNum)) {
                         finalText = `PROJECT ${currentID}: ${currentName}`;
                     } else if (!isNaN(idNum)) {
-                        const parentID = Math.floor(idNum).toString();
-                        const foundRange = sheet.getRange("A:A").find(parentID, { completeMatch: true, matchCase: false });
-                        const parentNameRange = foundRange.getOffsetRange(0, 1);
-                        parentNameRange.load("text");
-                        await context.sync();
-                        const pName = parentNameRange.text[0][0];
-                        finalText = `PROJECT ${parentID}: ${pName} (Task ${currentID})`;
+                        finalText = `PROJECT ${currentID}: Task`; 
                     }
                 }
-
                 setHudText(finalText);
-
+                
+                // Update Shape
                 const shape = sheet.shapes.getItem("TaskHUD");
-                shape.load("name");
+                shape.load("name"); // Check existence
                 await context.sync().then(() => {
                     shape.textFrame.textRange.text = finalText;
                     return context.sync();
@@ -124,28 +140,28 @@ function App() {
         } catch (error) {
             console.error("HUD Error:", error);
         } finally {
-            setTimeout(() => {
-                processingRef.current = false;
-            }, 200);
+            setTimeout(() => { processingRef.current = false; }, 200);
         }
     };
 
-    // --- UI RENDER (FLEXBOX LAYOUT FIX) ---
+    // --- UI RENDER ---
     return (
-        <div className="d-flex flex-column vh-100 bg-white">
-            {/* 1. FIXED HEADER (No Scroll) */}
+        <div className="d-flex flex-column vh-100 bg-white position-relative">
+            
+            {/* GLOBAL LOADER */}
+            <LoadingOverlay isVisible={isLoading} message={loadingMsg} />
+
+            {/* 1. HEADER */}
             <div className="flex-shrink-0">
                 <MainNavbar activeTab={activeTab} setActiveTab={setActiveTab} isFileValid={isValidFile} />
             </div>
 
-            {/* 2. SCROLLABLE BODY (Takes remaining space) */}
+            {/* 2. BODY */}
             <div className="flex-grow-1 overflow-auto p-3">
                 {!isValidFile ? (
                     <div className="mt-4">
                         <Alert variant="danger" className="shadow-sm border-danger text-center">
-                            <div className="mb-2" style={{fontSize: "1.5rem"}}>⛔</div>
                             <strong>Functionality Locked</strong>
-                            <p className="small mt-2 mb-0">Wrong File.</p>
                         </Alert>
                     </div>
                 ) : (
@@ -156,7 +172,7 @@ function App() {
                 )}
             </div>
 
-            {/* 3. FIXED FOOTER (No Scroll) */}
+            {/* 3. FOOTER */}
             <div className="bg-primary text-white shadow-lg px-3 py-2 d-flex justify-content-between align-items-center flex-shrink-0" 
                  style={{ fontSize: "0.8rem", borderTop: "3px solid #0d6efd", zIndex: 1030 }}>
                 <span className="fw-bold text-truncate" style={{maxWidth: "80%"}}>

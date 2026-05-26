@@ -13,6 +13,10 @@
 window.VisualLogic = {
     refreshGridAlerts: async (context) => {
         console.log("Visual Logic: Starting Grid Refresh (Phase 8 - In-Cell)...");
+
+        // 1. SHOW SPINNER
+        if (window.GlobalLoader) window.GlobalLoader.show("Syncing Visuals...");
+
         try {
             const sheet = context.workbook.worksheets.getItem("GanttChart");
 
@@ -166,6 +170,9 @@ window.VisualLogic = {
             if (error instanceof OfficeExtension.Error) {
                 console.log("Debug Info:", error.debugInfo);
             }
+        } finally {
+            // 2. HIDE SPINNER
+            if (window.GlobalLoader) window.GlobalLoader.hide();
         }
     }
 };

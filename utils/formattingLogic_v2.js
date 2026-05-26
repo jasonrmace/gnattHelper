@@ -1,22 +1,22 @@
 /* global Excel */
 
 // ==============================================================================
-// FORMATTING LOGIC ENGINE (Phase 13: The "Green Completion" Update)
+// FORMATTING LOGIC ENGINE (Phase 14: Priority Swap)
 // Replaces VBA 'GenerateSmartRules'
-// 
-// NEW FEATURE:
-// - If % Complete (Col H) is 100%, the bar turns GREEN (#00B050).
-// - This overrides the standard Grey progress bar.
 //
-// RETAINED FEATURES:
-// - Global PTO Columns (Light Grey #EAEAEA)
-// - Range Safety (Prevents crashes on infinite columns)
-// - Cell Scrubbing (Clears manual colors before applying rules)
+// CHANGES:
+// - Swapped Block F (PTO) and Block G (Holidays).
+// - Now Applies Holidays FIRST (Step 8), then PTO LAST (Step 9).
+// - Result: PTO Rule sits "On Top" of Holidays in the priority stack.
 // ==============================================================================
 
 window.FormattingLogic = {
     generateSmartRules: async (context) => {
-        console.log("Formatting Engine: I AM LOCAL! (Phase 13 - Green 100%)");
+        console.log("Formatting Engine: Starting...");
+        
+        // 1. SHOW SPINNER
+        if (window.GlobalLoader) window.GlobalLoader.show("Applying Rules...");
+
         try {
             const sheet = context.workbook.worksheets.getItem("GanttChart");
             const teamSheet = context.workbook.worksheets.getItem("Team");
@@ -177,8 +177,17 @@ window.FormattingLogic = {
             await context.sync();
             console.log(">> Parent Rows Applied.");
 
-            // --- BLOCK F: PTO (GLOBAL COLUMN) ---
-            console.log("STEP 8: Applying PTO (Global Column)...");
+            // --- BLOCK G: HOLIDAYS (SWAPPED UP) ---
+            console.log("STEP 8: Applying Holidays...");
+            const fHol = gridRange.conditionalFormats.add(Excel.ConditionalFormatType.custom);
+            fHol.custom.rule.formula = '=COUNTIF(ListHolidays,K$6)>0';
+            fHol.custom.format.fill.color = "#C8C8C8"; 
+            fHol.stopIfTrue = false;
+            await context.sync();
+            console.log(">> Holidays Applied.");
+
+            // --- BLOCK F: PTO (SWAPPED DOWN - HIGHER PRIORITY) ---
+            console.log("STEP 9: Applying PTO (Global Column)...");
             const fPTO = gridRange.conditionalFormats.add(Excel.ConditionalFormatType.custom);
             
             // Check if Date (K6) is within Start/End for ANYONE in the list
@@ -188,15 +197,6 @@ window.FormattingLogic = {
             await context.sync();
             console.log(">> PTO Applied.");
 
-            // --- BLOCK G: HOLIDAYS ---
-            console.log("STEP 9: Applying Holidays...");
-            const fHol = gridRange.conditionalFormats.add(Excel.ConditionalFormatType.custom);
-            fHol.custom.rule.formula = '=COUNTIF(ListHolidays,K$6)>0';
-            fHol.custom.format.fill.color = "#C8C8C8"; 
-            fHol.stopIfTrue = false;
-            await context.sync();
-            console.log(">> Holidays Applied.");
-
             console.log("Formatting Engine: ALL RULES SUCCESSFUL.");
 
         } catch (error) {
@@ -204,6 +204,9 @@ window.FormattingLogic = {
             if (error instanceof OfficeExtension.Error) {
                 console.log("Debug Info:", error.debugInfo);
             }
+        } finally {
+            // 2. HIDE SPINNER (Always runs, even if error)
+            if (window.GlobalLoader) window.GlobalLoader.hide();
         }
     }
 };
