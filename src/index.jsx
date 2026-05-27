@@ -41,7 +41,7 @@ const LoadingOverlay = ({ isVisible, message }) => {
 
 function App() {
     // --- STATE ---
-    const [version] = useState("v5.11.1"); 
+    const [version] = useState("v5.11.3"); 
     const [activeTab, setActiveTab] = useState("ProjectList");
     const [isValidFile, setIsValidFile] = useState(true);
     const [currentName, setCurrentName] = useState("");
@@ -254,13 +254,14 @@ function App() {
     // --- MODAL HANDLER ---
     const handleModalClose = () => {
         setShowIdentityModal(false);
-        // Check if they saved a name
+        // After the modal closes, check if a user was successfully saved.
+        // The modal itself will trigger a reload if successful, so this path
+        // is primarily for when the modal might close without a save (e.g., dev environment).
         const user = IdentityLogic.getIdentity();
         if (user) {
             showToast("Identity Saved", `Welcome to the team, ${user}!`);
         }
     };
-
     // --- HUD LOGIC ---
     const handleSelectionChange = async () => {
         if (processingRef.current) return;

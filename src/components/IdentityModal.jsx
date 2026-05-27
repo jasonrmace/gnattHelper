@@ -1,7 +1,6 @@
 /* global React, ReactBootstrap */
 import React, { useState, useEffect } from 'react';
 import { Modal, Button, Form, Spinner } from 'react-bootstrap';
-
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faUserTag } from '@fortawesome/free-solid-svg-icons';
 import { IdentityLogic } from '../utils/identityLogic';
@@ -26,12 +25,24 @@ const IdentityModal = ({ show, onHide }) => {
     }, [show]);
 
     const handleSave = () => {
-        if (selectedUser) {
+        if (selectedUser) { // Ensure a user is selected
             IdentityLogic.setIdentity(selectedUser);
-            onHide(); // Close modal
+            
+            // Verify save and trigger full add-in reload
+            if (IdentityLogic.getIdentity() === selectedUser) {
+                // This is the key: force a full reload of the add-in
+                // Office.addin.restart() is preferred for Office Add-ins
+                // window.location.reload() is a fallback or for web-only testing
+                if (Office.addin && typeof Office.addin.restart === 'function') {
+                    Office.addin.restart();
+                } else {
+                    window.location.reload();
+                }
+            }
+            // If reload doesn't happen (e.g., in a non-Office context), still hide the modal
+            onHide(); 
         }
     };
-
     return (
         <Modal show={show} onHide={onHide} backdrop="static" keyboard={false} centered aria-label="Identity Selection Modal">
             <Modal.Header>
@@ -64,9 +75,6 @@ const IdentityModal = ({ show, onHide }) => {
                 )}
             </Modal.Body>
             <Modal.Footer>
-                <Button variant="secondary" onClick={onHide}>
-                    Skip for Now
-                </Button>
                 <Button variant="primary" onClick={handleSave} disabled={!selectedUser}>
                     Save & Continue
                 </Button>
