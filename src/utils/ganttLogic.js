@@ -5,7 +5,7 @@
 // Replaces VBA 'UpdateParentAverages'
 // ==============================================================================
 
-window.GanttLogic = {
+export const GanttLogic = {
     updateProjectAverages: async (context) => {
         try {
             const sheet = context.workbook.worksheets.getItem("GanttChart");

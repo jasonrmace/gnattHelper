@@ -1,0 +1,42 @@
+{
+  "name": "gnatthelper",
+  "version": "5.9.0",
+  "description": "Helper functions for Barbizon Gnatt in Excel",
+  "type": "module",
+  "homepage": "https://jasonrmace.github.io/gnattHelper/",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "predeploy": "npm run build",
+    "deploy": "gh-pages -d dist"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jasonrmace/gnattHelper.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/jasonrmace/gnattHelper/issues"
+  },
+  "dependencies": {
+    "@fortawesome/fontawesome-svg-core": "^7.2.0",
+    "@fortawesome/free-regular-svg-icons": "^7.2.0",
+    "@fortawesome/free-solid-svg-icons": "^7.2.0",
+    "@fortawesome/react-fontawesome": "^3.3.1",
+    "bootstrap": "^5.3.8",
+    "react": "^19.2.6",
+    "react-bootstrap": "^2.10.10",
+    "react-dom": "^19.2.6",
+    "react-hot-toast": "^2.6.0"
+  },
+  "devDependencies": {
+    "@types/office-js": "^1.0.591",
+    "@vitejs/plugin-react": "^6.0.2",
+    "gh-pages": "^6.3.0",
+    "vite": "^8.0.14",
+    "vite-plugin-mkcert": "^2.0.0"
+  }
+}

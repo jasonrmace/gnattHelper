@@ -11,11 +11,11 @@
 //    - Project Rows (Whole Numbers): Ignored by Block C, caught by Block E (Grey).
 // ==============================================================================
 
-window.FormattingLogic = {
+export const FormattingLogic = {
     generateSmartRules: async (context) => {
         console.log("Formatting Engine: Starting...");
         
-        // 1. SHOW SPINNER
+        // 1. SHOW SPINNER (Referencing global loader from index.jsx)
         if (window.GlobalLoader) window.GlobalLoader.show("Applying Rules...");
 
         try {

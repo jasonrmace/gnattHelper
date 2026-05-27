@@ -1,7 +1,11 @@
 /* global React, ReactBootstrap, Excel */
-
-const { useState, useEffect } = React;
-const { Button, Card, Badge, Spinner, Modal, ButtonGroup, Form, Row, Col, Alert } = window.ReactBootstrap || {};
+import React, { useState, useEffect } from 'react';
+import { GanttLogic } from '../utils/ganttLogic';
+import { ChangelogLogic } from '../utils/changelogLogic';
+import { IdentityLogic } from '../utils/identityLogic';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faArrowLeft, faFolderPlus, faClipboardList, faLocationArrow, faPlus, faPencil, faTrash, faUser, faCalendarDays, faArrowRight } from '@fortawesome/free-solid-svg-icons';
+import { Button, Card, Badge, Spinner, Modal, ButtonGroup, Form, Row, Col, Alert } from 'react-bootstrap';
 
 const ProjectTasks = ({ project, onBack }) => {
     const [tasks, setTasks] = useState([]);
@@ -208,6 +212,7 @@ const ProjectTasks = ({ project, onBack }) => {
                     sheet.getCell(insertRowIndex, 1).values = [[formData.name]];
                     if (formData.lead) sheet.getCell(insertRowIndex, 2).values = [[formData.lead]];
                     if (formData.start) sheet.getCell(insertRowIndex, 4).values = [[formData.start]];
+                    await ChangelogLogic.logChange(context, `Added Task: "${formData.name}" to Project ${project.id}`);
                     
                     if (formData.start && formData.end) {
                         const s = new Date(formData.start);
@@ -219,9 +224,7 @@ const ProjectTasks = ({ project, onBack }) => {
                 }
 
                 // --- TRIGGER LOGIC ENGINE ---
-                if (window.GanttLogic) {
-                    await window.GanttLogic.updateProjectAverages(context);
-                }
+                await GanttLogic.updateProjectAverages(context);
                 await context.sync();
                 
                 setShowForm(false);
@@ -239,13 +242,12 @@ const ProjectTasks = ({ project, onBack }) => {
         try {
             await Excel.run(async (context) => {
                 const sheet = context.workbook.worksheets.getItem("GanttChart");
+                await ChangelogLogic.logChange(context, `Deleted Task: "${activeTask.name}" from Project ${project.id}`);
                 const range = sheet.getRangeByIndexes(activeTask.rowIndex, 0, 1, 1).getEntireRow();
                 range.delete(Excel.DeleteShiftDirection.up);
 
                 // --- TRIGGER LOGIC ENGINE ---
-                if (window.GanttLogic) {
-                    await window.GanttLogic.updateProjectAverages(context);
-                }
+                await GanttLogic.updateProjectAverages(context);
                 await context.sync();
                 
                 setShowDelete(false);
@@ -276,16 +278,16 @@ const ProjectTasks = ({ project, onBack }) => {
             {/* HEADER */}
             <div className="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom">
                 <div className="d-flex align-items-center">
-                    <Button variant="light" size="sm" className="me-2 text-muted" onClick={onBack} title="Back">
-                        <i className="fas fa-arrow-left"></i>
+                    <Button variant="light" size="sm" className="me-2 text-muted" onClick={onBack} title="Back to Project List">
+                        <FontAwesomeIcon icon={faArrowLeft} />
                     </Button>
                     <div style={{lineHeight: "1.1"}}>
                         <h6 className="m-0 fw-bold text-primary">{project.name}</h6>
-                        <small className="text-muted" style={{fontSize: "0.7rem"}}>Project {project.id} Task Manager</small>
+                        <small className="text-muted" style={{fontSize: "0.7rem"}}>Project {project.id} Task Manager</small> {/* Project ID is already a string */}
                     </div>
                 </div>
                 <Button variant="primary" size="sm" onClick={openAddModal}>
-                    <i className="fas fa-plus me-1"></i> Add Task
+                    <FontAwesomeIcon icon={faPlus} className="me-1" /> Add Task
                 </Button>
             </div>
 
@@ -293,8 +295,8 @@ const ProjectTasks = ({ project, onBack }) => {
             {isLoading ? (
                 <div className="text-center py-5"><Spinner animation="border" size="sm" variant="primary" /></div>
             ) : tasks.length === 0 ? (
-                <div className="text-center text-muted small mt-5">
-                    <i className="fas fa-clipboard-list fa-2x mb-2 text-secondary opacity-50"></i><br/>
+                <div className="text-center text-muted small mt-5" aria-label="No tasks found">
+                    <FontAwesomeIcon icon={faClipboardList} size="2x" className="mb-2 text-secondary opacity-50" /><br/>
                     No tasks found.
                 </div>
             ) : (
@@ -312,18 +314,18 @@ const ProjectTasks = ({ project, onBack }) => {
                                     </div>
                                     <ButtonGroup size="sm" className="ms-2 flex-shrink-0">
                                         <Button variant="light" className="px-2 text-primary" onClick={() => handleJump(t.rowIndex)} title="Locate">
-                                            <i className="fas fa-location-arrow" style={{fontSize: "0.7rem"}}></i>
+                                            <FontAwesomeIcon icon={faLocationArrow} style={{fontSize: "0.7rem"}} />
                                         </Button>
                                         {t.depth < 2 && (
                                             <Button variant="light" className="px-2 text-success" onClick={() => openSubTaskModal(t)} title="Add Sub-Task">
-                                                <i className="fas fa-plus" style={{fontSize: "0.7rem"}}></i>
+                                                <FontAwesomeIcon icon={faPlus} style={{fontSize: "0.7rem"}} />
                                             </Button>
                                         )}
                                         <Button variant="light" className="px-2 text-secondary" onClick={() => openEditModal(t)} title="Edit">
-                                            <i className="fas fa-pencil" style={{fontSize: "0.7rem"}}></i>
+                                            <FontAwesomeIcon icon={faPencil} style={{fontSize: "0.7rem"}} />
                                         </Button>
                                         <Button variant="light" className="px-2 text-danger" onClick={() => { setActiveTask(t); setShowDelete(true); }} title="Delete">
-                                            <i className="fas fa-trash" style={{fontSize: "0.7rem"}}></i>
+                                            <FontAwesomeIcon icon={faTrash} style={{fontSize: "0.7rem"}} />
                                         </Button>
                                     </ButtonGroup>
                                 </div>
@@ -331,8 +333,8 @@ const ProjectTasks = ({ project, onBack }) => {
                                 {/* BOTTOM ROW: LEAD (UPDATED), BADGE, DATES */}
                                 <div className="mt-2 small text-muted">
                                     <div className="d-flex justify-content-between mb-1 align-items-center">
-                                        <span className="d-flex align-items-center">
-                                            <i className="fas fa-user me-2 text-secondary opacity-50" style={{width: "14px"}}></i>
+                                        <span className="d-flex align-items-center" aria-label="Assigned Lead">
+                                            <FontAwesomeIcon icon={faUser} className="me-2 text-secondary opacity-50" style={{width: "14px"}} />
                                             
                                             {/* --- UPDATE: FULL NAME LOOKUP --- */}
                                             {(() => {
@@ -349,13 +351,13 @@ const ProjectTasks = ({ project, onBack }) => {
                                     </div>
                                     <div className="d-flex justify-content-between border-top pt-1 mt-1 px-1">
                                         <span className="d-flex align-items-center">
-                                            <i className="fas fa-calendar-days me-2 text-secondary" style={{width: "14px", textAlign: "center"}}></i>
+                                            <FontAwesomeIcon icon={faCalendarDays} className="me-2 text-secondary" style={{width: "14px", textAlign: "center"}} />
                                             {t.start === "TBD" || t.start === "" ? "TBD" : t.start}
                                         </span>
                                         {t.start !== "TBD" && t.start !== "" && (
                                             <>
-                                                <span className="mx-1 text-muted"><i className="fas fa-arrow-right" style={{fontSize: "0.7rem"}}></i></span>
-                                                <span>{t.end}</span>
+                                                <span className="mx-1 text-muted"><FontAwesomeIcon icon={faArrowRight} style={{fontSize: "0.7rem"}} /></span>
+                                                <span>{t.end}</span> {/* End date */}
                                             </>
                                         )}
                                     </div>
@@ -446,4 +448,4 @@ const ProjectTasks = ({ project, onBack }) => {
     );
 };
 
-window.ProjectTasks = ProjectTasks;
+export default ProjectTasks;

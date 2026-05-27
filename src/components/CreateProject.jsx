@@ -1,9 +1,13 @@
 /* global React, ReactBootstrap, Excel */
+import React, { useState, useEffect } from 'react';
+import { Button, Form, Spinner, Row, Col, Alert } from 'react-bootstrap';
 
-const { useState, useEffect } = React;
-const { Button, Form, Spinner, Row, Col, Alert } = ReactBootstrap;
+import { GanttLogic } from '../utils/ganttLogic';
+import { ChangelogLogic } from '../utils/changelogLogic';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faFolderPlus } from '@fortawesome/free-solid-svg-icons';
 
-const CreateProject = () => {
+const CreateProject = ({ onProjectCreated }) => {
     // --- STATE ---
     const [teamMembers, setTeamMembers] = useState([]);
     const [formData, setFormData] = useState({ name: "", lead: "", startDate: "", endDate: "" });
@@ -146,9 +150,10 @@ const CreateProject = () => {
 
                 // H. TRIGGER LOGIC ENGINES (Phase 2 Integration)
                 // Ensures internal formulas are correct immediately
-                if (window.GanttLogic) {
-                    await window.GanttLogic.updateProjectAverages(context);
-                }
+                await GanttLogic.updateProjectAverages(context);
+
+                // Record the change
+                await ChangelogLogic.logChange(context, `Created Project: ${formData.name} (ID: ${newId})`);
 
                 // I. ACTIVATE & SELECT
                 sheet.activate();
@@ -158,8 +163,8 @@ const CreateProject = () => {
                 setStatus({ msg: `Project "${formData.name}" (ID: ${newId}) Created!`, variant: "success" });
                 setFormData({ name: "", lead: "", startDate: "", endDate: "" });
 
-                if (window.Home && window.Home.triggerRefresh) {
-                    window.Home.triggerRefresh();
+                if (onProjectCreated) {
+                    onProjectCreated();
                 }
             });
         } catch (error) {
@@ -172,8 +177,8 @@ const CreateProject = () => {
     };
 
     return (
-        <div className="bg-light p-3 rounded mb-4 border">
-            <h6 className="fw-bold text-primary mb-3"><i className="fas fa-folder-plus me-2"></i>New Project</h6>
+        <div className="bg-light p-3 rounded mb-4 border" aria-label="New Project Form">
+            <h6 className="fw-bold text-primary mb-3"><FontAwesomeIcon icon={faFolderPlus} className="me-2" />New Project</h6>
             
             {/* PROJECT NAME */}
             <Form.Group className="mb-2">
@@ -243,7 +248,7 @@ const CreateProject = () => {
                 disabled={isLoading || !formData.name}
             >
                 {isLoading ? (
-                    <>
+                    <> {/* Loading spinner and text */}
                         <Spinner as="span" animation="border" size="sm" role="status" aria-hidden="true" className="me-2" />
                         Working...
                     </>
@@ -260,4 +265,4 @@ const CreateProject = () => {
     );
 };
 
-window.CreateProject = CreateProject;
+export default CreateProject;

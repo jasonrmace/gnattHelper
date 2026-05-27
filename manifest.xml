@@ -8,7 +8,7 @@
 
   <!-- 1. ID & VERSION -->
   <Id>c3a934c6-5412-4312-b532-986572134512</Id>
-  <Version>4.6.3</Version>
+  <Version>5.9.0</Version>
   <ProviderName>Jason Mace</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
   
@@ -30,7 +30,7 @@
 
   <!-- 6. DEFAULT SETTINGS (Legacy) -->
   <DefaultSettings>
-    <SourceLocation DefaultValue="https://jasonrmace.github.io/gnattHelper/taskpane.html" />
+    <SourceLocation DefaultValue="https://jasonrmace.github.io/gnattHelper/index.html" />
   </DefaultSettings>
 
   <!-- 7. PERMISSIONS -->
@@ -83,7 +83,7 @@
         <bt:Image id="Icon.80x80" DefaultValue="https://jasonrmace.github.io/gnattHelper/assets/logo-80.png"/>
       </bt:Images>
       <bt:Urls>
-        <bt:Url id="Taskpane.Url" DefaultValue="https://jasonrmace.github.io/gnattHelper/taskpane.html" />
+        <bt:Url id="Taskpane.Url" DefaultValue="https://jasonrmace.github.io/gnattHelper/index.html" />
       </bt:Urls>
       <bt:ShortStrings>
         <bt:String id="GroupLabel" DefaultValue="Barbizon Tools"/>

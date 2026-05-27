@@ -1,10 +1,10 @@
 /* global React, ReactBootstrap, Excel */
+import ProjectTasks from './ProjectTasks';
 
-const { useState, useEffect, useRef } = React;
-const { Button, Card, Badge, Spinner } = window.ReactBootstrap || {};
-
-// IMPORT CHILD COMPONENT
-const ProjectTasks = window.ProjectTasks;
+import React, { useState, useEffect, useRef } from 'react';
+import { Button, Card, Badge, Spinner } from 'react-bootstrap';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faLocationArrow, faListCheck, faChevronRight, faUser, faCalendarDays, faArrowRight, faSyncAlt } from '@fortawesome/free-solid-svg-icons';
 
 const ProjectList = ({ refreshTrigger }) => {
     // --- STATE ---
@@ -139,7 +139,7 @@ const ProjectList = ({ refreshTrigger }) => {
             <div className="d-flex justify-content-between align-items-center mb-2">
                 <h6 className="m-0 fw-bold text-primary">Active Projects ({projects.length})</h6>
                 <Button variant="link" size="sm" className="text-decoration-none p-0" onClick={fetchProjects}>
-                    {isFetching ? <Spinner animation="border" size="sm" /> : "Refresh"}
+                    {isFetching ? <Spinner animation="border" size="sm" /> : <><FontAwesomeIcon icon={faSyncAlt} className="me-1" /> Refresh</>}
                 </Button>
             </div>
 
@@ -162,17 +162,17 @@ const ProjectList = ({ refreshTrigger }) => {
                                     </span>
                                 </div>
                                 <div className="d-flex align-items-center flex-shrink-0 ms-2">
-                                    <Badge bg={p.percent === "100%" ? "success" : p.percent === "0%" ? "danger" : "warning"} pill className="me-2">
+                                    <Badge bg={p.percent === "100%" ? "success" : p.percent === "0%" ? "danger" : "warning"} pill className="me-2" style={{minWidth: "45px"}}>
                                         {p.percent || "0%"}
                                     </Badge>
                                     <Button variant="light" size="sm" className="text-primary p-1 lh-1" onClick={() => handleJump(p.rowIndex)}>
-                                        <i className="fas fa-location-arrow"></i>
+                                        <FontAwesomeIcon icon={faLocationArrow} />
                                     </Button>
                                 </div>
                             </div>
                             
                             <div className="mt-2 small text-muted">
-                                
+                                {/* Task Summary */}
                                 {/* CLICKABLE TASKS BUTTON */}
                                 <div 
                                     className="d-flex justify-content-between mb-1 text-dark p-1 rounded border border-light" 
@@ -189,23 +189,23 @@ const ProjectList = ({ refreshTrigger }) => {
                                     title="Click to Manage Tasks"
                                 >
                                     <span className="fw-bold" style={{fontSize: "0.9em"}}>
-                                        <i className="fas fa-list-check me-2 text-primary"></i> 
+                                        <FontAwesomeIcon icon={faListCheck} className="me-2 text-primary" />  
                                         Tasks: {p.completedTasks}/{p.totalTasks}
                                     </span>
-                                    <span className="text-primary"><i className="fas fa-chevron-right" style={{fontSize: "0.8em"}}></i></span>
+                                    <span className="text-primary"><FontAwesomeIcon icon={faChevronRight} style={{fontSize: "0.8em"}} /></span>
                                 </div>
 
                                 <div className="d-flex justify-content-between mb-1 px-1">
-                                    <span><i className="fas fa-user me-2 text-secondary" style={{width: "14px", textAlign: "center"}}></i> {p.lead || "Unassigned"}</span>
+                                    <span><FontAwesomeIcon icon={faUser} className="me-2 text-secondary" style={{width: "14px", textAlign: "center"}} /> {p.lead || "Unassigned"}</span>
                                 </div>
                                 <div className="d-flex justify-content-between border-top pt-1 mt-1 px-1">
                                     <span className="d-flex align-items-center">
-                                        <i className="fas fa-calendar-days me-2 text-secondary" style={{width: "14px", textAlign: "center"}}></i>
+                                        <FontAwesomeIcon icon={faCalendarDays} className="me-2 text-secondary" style={{width: "14px", textAlign: "center"}} />
                                         {p.start === "TBD" || p.start === "" ? "TBD" : p.start}
                                     </span>
                                     {p.start !== "TBD" && p.start !== "" && (
                                         <>
-                                            <span className="mx-1 text-muted"><i className="fas fa-arrow-right" style={{fontSize: "0.7rem"}}></i></span>
+                                            <span className="mx-1 text-muted"><FontAwesomeIcon icon={faArrowRight} style={{fontSize: "0.7rem"}} /></span>
                                             <span>{p.end}</span>
                                         </>
                                     )}
@@ -219,4 +219,4 @@ const ProjectList = ({ refreshTrigger }) => {
     );
 };
 
-window.ProjectList = ProjectList;
+export default ProjectList;

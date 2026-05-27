@@ -3,18 +3,18 @@
 // ==============================================================================
 // IDENTITY LOGIC ENGINE (Phase 3: Full Name Support)
 // Purpose: Manages "Who am I?" state using LocalStorage.
-// CHANGE: Now fetches { first, full } objects instead of just name strings.
+// CHANGE: Now exports a module instead of attaching to window.
 // ==============================================================================
 
-window.IdentityLogic = {
-    
+export const IdentityLogic = {
     // KEY for storage
     STORAGE_KEY: "barbizon_user_identity",
 
     // 1. GET CURRENT IDENTITY
     getIdentity: () => {
         try {
-            return localStorage.getItem(window.IdentityLogic.STORAGE_KEY);
+            // Updated: referencing the const directly, not window
+            return localStorage.getItem(IdentityLogic.STORAGE_KEY);
         } catch (e) {
             console.warn("LocalStorage access denied:", e);
             return null;
@@ -24,7 +24,7 @@ window.IdentityLogic = {
     // 2. SET IDENTITY
     setIdentity: (name) => {
         try {
-            localStorage.setItem(window.IdentityLogic.STORAGE_KEY, name);
+            localStorage.setItem(IdentityLogic.STORAGE_KEY, name);
             console.log(`Identity saved: ${name}`);
         } catch (e) {
             console.error("Failed to save identity:", e);
@@ -33,7 +33,7 @@ window.IdentityLogic = {
 
     // 3. CLEAR IDENTITY
     clearIdentity: () => {
-        localStorage.removeItem(window.IdentityLogic.STORAGE_KEY);
+        localStorage.removeItem(IdentityLogic.STORAGE_KEY);
     },
 
     // 4. FETCH TEAM LIST (Returns Objects: { first: "Chris", full: "Chris Smith" })
@@ -41,13 +41,12 @@ window.IdentityLogic = {
         try {
             return await Excel.run(async (context) => {
                 const table = context.workbook.worksheets.getItem("Team").tables.getItem("Team");
-                
+
                 // 1. Get First Name Column (Required)
                 const firstCol = table.columns.getItem("First Name").getDataBodyRange();
                 firstCol.load("values");
 
                 // 2. Get Last Name Column (Optional - safer check)
-                // We use getItemOrNullObject so it doesn't crash if the column is missing
                 const lastCol = table.columns.getItemOrNullObject("Last Name");
                 lastCol.load("isNullObject");
 
@@ -69,18 +68,15 @@ window.IdentityLogic = {
 
                 for (let i = 0; i < firstNames.length; i++) {
                     const first = firstNames[i][0]?.toString().trim();
-                    
+
                     if (first && !seen.has(first)) {
                         // Get Last Name safely (if column exists and row has data)
-                        const last = (lastNames.length > i && lastNames[i][0]) 
-                                     ? lastNames[i][0].toString().trim() 
-                                     : "";
+                        const last = (lastNames.length > i && lastNames[i][0]) ? lastNames[i][0].toString().trim() : "";
 
                         members.push({
-                            first: first,                            // Saved to LocalStorage (e.g., "Chris")
-                            full: last ? `${first} ${last}` : first  // Shown in Dropdown (e.g., "Chris Smith")
+                            first: first, // Saved to LocalStorage (e.g., "Chris")
+                            full: last ? `${first} ${last}` : first // Shown in Dropdown (e.g., "Chris Smith")
                         });
-                        
                         seen.add(first);
                     }
                 }
@@ -90,7 +86,7 @@ window.IdentityLogic = {
             });
         } catch (error) {
             console.error("Error fetching team (Check 'First Name' column):", error);
-            return []; 
+            return [];
         }
     }
 };

@@ -1,7 +1,10 @@
 /* global React, ReactBootstrap */
+import React, { useState, useEffect }from 'react';
+import { Container, Form, Button, Alert, Spinner, Card } from 'react-bootstrap';
 
-const { useState, useEffect } = React;
-const { Container, Form, Button, Alert, Spinner, Card } = ReactBootstrap;
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faUserCog, faCheckCircle } from '@fortawesome/free-solid-svg-icons';
+import { IdentityLogic } from '../utils/identityLogic';
 
 const SettingsPage = () => {
     const [teamList, setTeamList] = useState([]);
@@ -12,15 +15,14 @@ const SettingsPage = () => {
     // 1. Load Data on Mount
     useEffect(() => {
         const loadData = async () => {
-            if (window.IdentityLogic) {
-                // A. Fetch Team Members (Now returns { first, full })
-                const members = await window.IdentityLogic.fetchTeamMembers();
-                setTeamList(members);
+            // A. Fetch Team Members (Now returns { first, full })
+            const members = await IdentityLogic.fetchTeamMembers();
+            setTeamList(members);
 
-                // B. Get Current Saved Identity
-                const current = window.IdentityLogic.getIdentity();
-                if (current) setSelectedUser(current);
-            }
+            // B. Get Current Saved Identity
+            const current = IdentityLogic.getIdentity();
+            if (current) setSelectedUser(current);
+            
             setIsLoading(false);
         };
         loadData();
@@ -28,13 +30,11 @@ const SettingsPage = () => {
 
     // 2. Handle Save
     const handleSave = () => {
-        if (window.IdentityLogic) {
-            window.IdentityLogic.setIdentity(selectedUser);
-            setShowSuccess(true);
-            
-            // Hide success message after 3 seconds
-            setTimeout(() => setShowSuccess(false), 3000);
-        }
+        IdentityLogic.setIdentity(selectedUser);
+        setShowSuccess(true);
+        
+        // Hide success message after 3 seconds
+        setTimeout(() => setShowSuccess(false), 3000);
     };
 
     if (isLoading) {
@@ -47,8 +47,8 @@ const SettingsPage = () => {
     }
 
     return (
-        <Container className="mt-4">
-            <h4 className="mb-4"><i className="fas fa-user-cog me-2"></i> User Settings</h4>
+        <Container className="mt-4" aria-label="User Settings Page">
+            <h4 className="mb-4"><FontAwesomeIcon icon={faUserCog} className="me-2" /> User Settings</h4>
             
             <Card className="shadow-sm">
                 <Card.Body>
@@ -72,7 +72,7 @@ const SettingsPage = () => {
 
                         {showSuccess && (
                             <Alert variant="success" className="py-2">
-                                <i className="fas fa-check-circle me-2"></i> Identity Saved!
+                                <FontAwesomeIcon icon={faCheckCircle} className="me-2" /> Identity Saved!
                             </Alert>
                         )}
 
@@ -94,4 +94,4 @@ const SettingsPage = () => {
     );
 };
 
-window.SettingsPage = SettingsPage;
+export default SettingsPage;

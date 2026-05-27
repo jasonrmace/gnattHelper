@@ -1,7 +1,10 @@
 /* global React, ReactBootstrap */
+import React, { useState, useEffect } from 'react';
+import { Modal, Button, Form, Spinner } from 'react-bootstrap';
 
-const { useState, useEffect } = React;
-const { Modal, Button, Form, Spinner } = ReactBootstrap;
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faUserTag } from '@fortawesome/free-solid-svg-icons';
+import { IdentityLogic } from '../utils/identityLogic';
 
 const IdentityModal = ({ show, onHide }) => {
     const [teamList, setTeamList] = useState([]);
@@ -10,11 +13,11 @@ const IdentityModal = ({ show, onHide }) => {
 
     // Load Team Data when the Modal opens
     useEffect(() => {
-        if (show && window.IdentityLogic) {
+        if (show) {
             const fetchData = async () => {
                 setIsLoading(true);
                 // Now returns objects: [{ first: "Chris", full: "Chris Smith" }]
-                const members = await window.IdentityLogic.fetchTeamMembers();
+                const members = await IdentityLogic.fetchTeamMembers();
                 setTeamList(members);
                 setIsLoading(false);
             };
@@ -23,16 +26,16 @@ const IdentityModal = ({ show, onHide }) => {
     }, [show]);
 
     const handleSave = () => {
-        if (window.IdentityLogic && selectedUser) {
-            window.IdentityLogic.setIdentity(selectedUser);
+        if (selectedUser) {
+            IdentityLogic.setIdentity(selectedUser);
             onHide(); // Close modal
         }
     };
 
     return (
-        <Modal show={show} onHide={onHide} backdrop="static" keyboard={false} centered>
+        <Modal show={show} onHide={onHide} backdrop="static" keyboard={false} centered aria-label="Identity Selection Modal">
             <Modal.Header>
-                <Modal.Title><i className="fas fa-user-tag me-2"></i>Welcome!</Modal.Title>
+                <Modal.Title><FontAwesomeIcon icon={faUserTag} className="me-2" />Welcome!</Modal.Title>
             </Modal.Header>
             <Modal.Body>
                 <p className="text-muted small">
@@ -72,4 +75,4 @@ const IdentityModal = ({ show, onHide }) => {
     );
 };
 
-window.IdentityModal = IdentityModal;
+export default IdentityModal;

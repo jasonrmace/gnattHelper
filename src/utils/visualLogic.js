@@ -8,7 +8,7 @@
 // 1. Formatting: Now uses "&" for the last name (e.g., "A, B & C are on PTO").
 // ==============================================================================
 
-window.VisualLogic = {
+export const VisualLogic = {
     refreshGridAlerts: async (context) => {
         console.log("Visual Logic: Starting Grid Refresh (Phase 10 - Grammar)...");
         
