@@ -1,11 +1,18 @@
 # Local Development Certificates (Security Risk if committed)
 cert.pem
 key.pem
+# Dependencies
+node_modules/
 
 # Local Dev Manifest
 manifest-local.xml
+# Build output
+dist/
 
 # Standard Node.js ignores (Recommended)
 node_modules/
+# IDE / OS Files
 .DS_Store
 Thumbs.db
+.vscode/
+*.log
