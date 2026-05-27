@@ -18,7 +18,7 @@ import IdentityModal from './components/IdentityModal';
 import UpdatesPage from './components/UpdatesPage';
 
 // 1. CONFIGURATION
-const ALLOWED_FILENAMES = ["Houston Summer 2026 [Macros].xlsm", "Houston Summer 2026.xls"];
+const ALLOWED_FILENAMES = ["Houston Summer 2026 [Macros].xlsm", "Houston Summer 2026.xlsx"];
 
 // --- GLOBAL LOADING OVERLAY ---
 const LoadingOverlay = ({ isVisible, message }) => {
@@ -41,7 +41,7 @@ const LoadingOverlay = ({ isVisible, message }) => {
 
 function App() {
     // --- STATE ---
-    const [version] = useState("v5.11.3"); 
+    const [version] = useState("v5.11.4"); 
     const [activeTab, setActiveTab] = useState("ProjectList");
     const [isValidFile, setIsValidFile] = useState(true);
     const [currentName, setCurrentName] = useState("");
