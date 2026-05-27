@@ -41,7 +41,7 @@ const LoadingOverlay = ({ isVisible, message }) => {
 
 function App() {
     // --- STATE ---
-    const [version] = useState("v5.11.0"); 
+    const [version] = useState("v5.11.1"); 
     const [activeTab, setActiveTab] = useState("ProjectList");
     const [isValidFile, setIsValidFile] = useState(true);
     const [currentName, setCurrentName] = useState("");
@@ -191,7 +191,8 @@ function App() {
                 });
 
                 // Show summary toast if there are missed updates
-                if (count > 0) {
+                const nonAdminCount = count - adminLogs.length;
+                if (nonAdminCount > 0) {
                     toast.custom((t) => (
                         <div className={`${t.visible ? 'animate-enter' : 'animate-leave'} bg-white shadow-lg rounded-lg pointer-events-auto d-flex border border-light`}
                              style={{ minWidth: '350px' }}>
@@ -200,7 +201,7 @@ function App() {
                                     <FontAwesomeIcon icon={faBell} className="text-primary mt-1" />
                                     <div className="ms-3">
                                         <p className="text-sm font-medium text-dark mb-1" style={{ fontSize: '0.9rem' }}>
-                                            You have missed {count} {count === 1 ? 'update' : 'updates'}.
+                                            You have missed {nonAdminCount} {nonAdminCount === 1 ? 'update' : 'updates'}.
                         </p>
                                         <button 
                                             className="btn btn-link p-0 border-0 fw-bold text-primary"
