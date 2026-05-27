@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Container, Nav, Navbar, NavDropdown, Badge } from 'react-bootstrap';
 
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faBell, faPaintRoller, faUserCog, faFileExport, faPrint, faBars, faUserCircle, faCodeCompare } from '@fortawesome/free-solid-svg-icons';
+import { faBell, faPaintRoller, faUserCog, faFileExport, faPrint, faBars, faUserCircle, faCodeCompare, faTimes } from '@fortawesome/free-solid-svg-icons';
 import { VisualLogic } from '../utils/visualLogic';
 import { FormattingLogic } from '../utils/formattingLogic_v2';
 import { faCircleUser } from '@fortawesome/free-regular-svg-icons';
@@ -85,33 +85,35 @@ const MainNavbar = ({ activeTab, setActiveTab, isFileValid, unseenCount }) => {
 
             {/* USER ICON & TOGGLE GROUP (Always on the right) */}
             <div className="d-flex align-items-center order-lg-last">
-                <NavDropdown 
-                    align="end"
-                    title={
-                        <div className="position-relative d-inline-block">
-                            <FontAwesomeIcon icon={faCircleUser} size="lg" className="text-white opacity-75" />
-                            {unseenCount > 0 && (
-                                <Badge 
-                                    pill bg="danger" 
-                                    className="position-absolute top-0 start-75 translate-middle"
-                                    style={{ fontSize: '0.6rem', padding: '0.25em 0.5em' }}
-                                >
-                                    {unseenCount}
-                                </Badge>
-                            )}
-                        </div>
-                    } 
-                    id="user-nav-dropdown"
-                    className="me-2 no-caret"
-                >
-                    <NavDropdown.Item eventKey="Updates" className="d-flex justify-content-between align-items-center">
-                        <span><FontAwesomeIcon icon={faCodeCompare} className="me-2 text-muted" />Change History</span>
-                        {unseenCount > 0 && <Badge bg="danger" pill className="ms-2">{unseenCount}</Badge>}
-                    </NavDropdown.Item>
-                    <NavDropdown.Item eventKey="Settings">
-                        <FontAwesomeIcon icon={faUserCog} className="me-2 text-muted" /> User Settings
-                    </NavDropdown.Item>
-                </NavDropdown>
+                {isFileValid && (
+                    <NavDropdown 
+                        align="end"
+                        title={
+                            <div className="position-relative d-inline-block">
+                                <FontAwesomeIcon icon={faCircleUser} size="lg" className="text-white opacity-75" />
+                                {unseenCount > 0 && (
+                                    <Badge 
+                                        pill bg="danger" 
+                                        className="position-absolute top-0 start-75 translate-middle"
+                                        style={{ fontSize: '0.6rem', padding: '0.25em 0.5em' }}
+                                    >
+                                        {unseenCount}
+                                    </Badge>
+                                )}
+                            </div>
+                        } 
+                        id="user-nav-dropdown"
+                        className="me-2 no-caret"
+                    >
+                        <NavDropdown.Item eventKey="Updates" className="d-flex justify-content-between align-items-center">
+                            <span><FontAwesomeIcon icon={faCodeCompare} className="me-2 text-muted" />Change History</span>
+                            {unseenCount > 0 && <Badge bg="danger" pill className="ms-2">{unseenCount}</Badge>}
+                        </NavDropdown.Item>
+                        <NavDropdown.Item eventKey="Settings">
+                            <FontAwesomeIcon icon={faUserCog} className="me-2 text-muted" /> User Settings
+                        </NavDropdown.Item>
+                    </NavDropdown>
+                )}
                 
                 <Navbar.Toggle aria-controls="basic-navbar-nav" />
             </div>
@@ -143,8 +145,8 @@ const MainNavbar = ({ activeTab, setActiveTab, isFileValid, unseenCount }) => {
                             </NavDropdown>
                         </>
                     ) : (
-                        <Nav.Item className="text-muted small pt-2 fst-italic">
-                            Functions Disabled
+                        <Nav.Item className="text-danger small pt-2 fw-bold">
+                            <FontAwesomeIcon icon={faTimes} className="me-2" /> Helpers Inactive
                         </Nav.Item>
                     )}
                 </Nav>

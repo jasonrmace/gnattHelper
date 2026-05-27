@@ -18,7 +18,7 @@ import IdentityModal from './components/IdentityModal';
 import UpdatesPage from './components/UpdatesPage';
 
 // 1. CONFIGURATION
-const REQUIRED_FILENAME = "Houston Summer 2026 [Macros].xlsm";
+const ALLOWED_FILENAMES = ["Houston Summer 2026 [Macros].xlsm", "Houston Summer 2026.xls"];
 
 // --- GLOBAL LOADING OVERLAY ---
 const LoadingOverlay = ({ isVisible, message }) => {
@@ -41,12 +41,13 @@ const LoadingOverlay = ({ isVisible, message }) => {
 
 function App() {
     // --- STATE ---
-    const [version] = useState("v5.9.0"); 
+    const [version] = useState("v5.11.0"); 
     const [activeTab, setActiveTab] = useState("ProjectList");
     const [isValidFile, setIsValidFile] = useState(true);
     const [currentName, setCurrentName] = useState("");
     const [hudText, setHudText] = useState("Ready");
     const [refreshTrigger, setRefreshTrigger] = useState(0);
+    const [fileError, setFileError] = useState("");
     const [unseenCount, setUnseenCount] = useState(0);
     
     // LOADER & MODAL STATE
@@ -110,9 +111,21 @@ function App() {
                 console.log("Office Ready");
 
                 const url = Office.context.document.url;
+                
+                // Handle New/Unsaved File
+                if (!url) {
+                    setIsValidFile(false);
+                    setFileError("You have loaded a new excel file and Barbizon Helpers do not work here.");
+                    setHudText("Inactive");
+                    return;
+                }
+
                 const decodedUrl = decodeURI(url);
-                const segments = decodedUrl.split('/');
-                setCurrentName(segments[segments.length - 1]);
+                const fileName = decodedUrl.substring(decodedUrl.lastIndexOf('/') + 1);
+                setCurrentName(fileName);
+
+                const isAllowed = ALLOWED_FILENAMES.includes(fileName);
+                setIsValidFile(isAllowed);
 
                 // A. Register HUD Selection Listener
                 Office.context.document.addHandlerAsync(
@@ -121,6 +134,13 @@ function App() {
                 );
 
                 // B. Register Watchdog
+                if (!isAllowed) {
+                    setFileError(`Helpers are locked for "${fileName}". Please open an approved Houston template.`);
+                    setHudText("Locked");
+                    return;
+                }
+
+                // Continue initialization only if file is allowed
                 await EventListeners.register();
 
                 // D. Check for missed changes while user was away (including Admin specific ones)
@@ -332,9 +352,13 @@ function App() {
             {/* 2. BODY */}
             <div className="flex-grow-1 overflow-auto p-3">
                 {!isValidFile ? (
-                    <div className="mt-4">
-                        <Alert variant="danger" className="shadow-sm border-danger text-center">
-                            <strong>Functionality Locked</strong>
+                    <div className="mt-5 px-2">
+                        <Alert variant="warning" className="shadow-sm border-warning text-center py-4">
+                            <FontAwesomeIcon icon={faTimes} size="2x" className="text-danger mb-3" />
+                            <h5 className="fw-bold">Functionality Locked</h5>
+                            <p className="mb-0 small text-muted">
+                                {fileError}
+                            </p>
                         </Alert>
                     </div>
                 ) : (
