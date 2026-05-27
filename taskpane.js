@@ -5,7 +5,8 @@ const REQUIRED_FILENAME = "Houston Summer 2026 [Macros].xlsm";
 
 // 2. UNPACK LIBRARIES
 const { useState, useEffect, useRef } = React;
-const { Container, Alert, Spinner } = ReactBootstrap || {};
+const { Container, Alert, Spinner, Toast, ToastContainer } = ReactBootstrap || {};
+
 const MainNavbar = window.MainNavbar;
 const CreateProject = window.CreateProject;
 const ProjectList = window.ProjectList;
@@ -33,7 +34,7 @@ const LoadingOverlay = ({ isVisible, message }) => {
 
 function App() {
     // --- STATE ---
-    const [version] = useState("v4.6.3"); 
+    const [version] = useState("v4.7.3 (Bottom Toasts)"); 
     const [activeTab, setActiveTab] = useState("ProjectList");
     const [isValidFile, setIsValidFile] = useState(true);
     const [currentName, setCurrentName] = useState("");
@@ -44,7 +45,15 @@ function App() {
     const [loadingMsg, setLoadingMsg] = useState("Processing...");
     const [showIdentityModal, setShowIdentityModal] = useState(false);
     
+    // TOAST STATE
+    const [toastState, setToastState] = useState({ show: false, msg: "", title: "" });
+    
     const processingRef = useRef(false);
+
+    // --- HELPER: TRIGGER TOAST ---
+    const showToast = (title, msg) => {
+        setToastState({ show: true, title, msg });
+    };
 
     // --- EXPOSE LOADER TO WINDOW ---
     useEffect(() => {
@@ -86,6 +95,9 @@ function App() {
                     const user = window.IdentityLogic.getIdentity();
                     if (!user) {
                         setShowIdentityModal(true);
+                    } else {
+                        // SUCCESS: Show Toast
+                        showToast("Welcome Back!", `Good to see you, ${user}.`);
                     }
                 }
             }
@@ -98,6 +110,18 @@ function App() {
             );
         };
     }, []);
+
+    // --- MODAL HANDLER ---
+    const handleModalClose = () => {
+        setShowIdentityModal(false);
+        // Check if they saved a name
+        if (window.IdentityLogic) {
+            const user = window.IdentityLogic.getIdentity();
+            if (user) {
+                showToast("Identity Saved", `Welcome to the team, ${user}!`);
+            }
+        }
+    };
 
     // --- HUD LOGIC ---
     const handleSelectionChange = async () => {
@@ -127,20 +151,13 @@ function App() {
 
                 if (currentID) {
                     const idNum = parseFloat(currentID);
-                    
-                    // CASE 1: Integer (Project Header)
                     if (Number.isInteger(idNum)) {
                         finalText = `PROJECT ${currentID}: ${currentName}`;
-                    } 
-                    // CASE 2: Decimal (Task Row)
-                    else if (!isNaN(idNum)) {
+                    } else if (!isNaN(idNum)) {
                         const parentID = Math.floor(idNum).toString();
-                        
                         const foundRange = sheet.getRange("A:A").find(parentID, { 
-                            completeMatch: true, 
-                            matchCase: false 
+                            completeMatch: true, matchCase: false 
                         });
-                        
                         const parentNameRange = foundRange.getOffsetRange(0, 1);
                         parentNameRange.load("text");
                         await context.sync();
@@ -169,13 +186,37 @@ function App() {
     return (
         <div className="d-flex flex-column vh-100 bg-white position-relative">
             
+            {/* TOAST CONTAINER (Bottom Center) */}
+            {/* marginBottom: 50px ensures it floats ABOVE the blue footer bar */}
+            <ToastContainer 
+                className="p-3" 
+                position="bottom-center" 
+                style={{zIndex: 1055, marginBottom: "50px"}}
+            >
+                <Toast 
+                    onClose={() => setToastState({...toastState, show: false})} 
+                    show={toastState.show} 
+                    delay={8000} // Increased to 8 seconds
+                    autohide 
+                    // bg="dark"
+                >
+                    <Toast.Header>
+                        <strong className="me-auto text-primary">{toastState.title}</strong>
+                        <small>Just now</small>
+                    </Toast.Header>
+                    <Toast.Body>
+                        {toastState.msg}
+                    </Toast.Body>
+                </Toast>
+            </ToastContainer>
+
             {/* GLOBAL LOADER */}
             <LoadingOverlay isVisible={isLoading} message={loadingMsg} />
 
             {/* IDENTITY MODAL */}
             <IdentityModal 
                 show={showIdentityModal} 
-                onHide={() => setShowIdentityModal(false)} 
+                onHide={handleModalClose} 
             />
 
             {/* 1. HEADER */}
@@ -204,7 +245,6 @@ function App() {
             <div className="bg-primary text-white shadow-lg px-3 py-2 d-flex justify-content-between align-items-center flex-shrink-0" 
                  style={{ fontSize: "0.8rem", borderTop: "3px solid #0d6efd", zIndex: 1030 }}>
                 
-                {/* ADDED: title={hudText} for hover support */}
                 <span 
                     className="fw-bold text-truncate" 
                     style={{maxWidth: "80%", cursor: "help"}} 
