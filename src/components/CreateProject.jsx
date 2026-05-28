@@ -10,7 +10,7 @@ import { faFolderPlus } from '@fortawesome/free-solid-svg-icons';
 const CreateProject = ({ onProjectCreated }) => {
     // --- STATE ---
     const [teamMembers, setTeamMembers] = useState([]);
-    const [formData, setFormData] = useState({ name: "", lead: "", startDate: "", endDate: "", projectNumber: "" });
+    const [formData, setFormData] = useState({ name: "", lead: "", startDate: "", endDate: "", projectNumber: "", isServiceCall: false });
     const [status, setStatus] = useState({ msg: "", variant: "light" });
     const [isLoading, setIsLoading] = useState(false);
 
@@ -54,7 +54,7 @@ const CreateProject = ({ onProjectCreated }) => {
             setStatus({ msg: "Project Name is required.", variant: "danger" });
             return;
         }
-        if (!formData.projectNumber) {
+        if (!formData.isServiceCall && !formData.projectNumber) {
             setStatus({ msg: "Project Number is required.", variant: "danger" });
             return;
         }
@@ -183,7 +183,7 @@ const CreateProject = ({ onProjectCreated }) => {
                 await context.sync();
 
                 setStatus({ msg: `Project "${formData.name}" (ID: ${newId}) Created!`, variant: "success" });
-                setFormData({ name: "", lead: "", startDate: "", endDate: "", projectNumber: "" });
+                setFormData({ name: "", lead: "", startDate: "", endDate: "", projectNumber: "", isServiceCall: false });
 
                 if (onProjectCreated) {
                     onProjectCreated();
@@ -201,23 +201,12 @@ const CreateProject = ({ onProjectCreated }) => {
     return (
         <div className="bg-light p-3 rounded mb-4 border" aria-label="New Project Form">
             <h6 className="fw-bold text-primary mb-3"><FontAwesomeIcon icon={faFolderPlus} className="me-2" />New Project</h6>
-            
-            {/* PROJECT NUMBER */}
-            <Form.Group className="mb-2">
-                <Form.Label className="small fw-bold text-muted">PROJECT NUMBER</Form.Label>
-                <Form.Control 
-                    size="sm" 
-                    type="text" 
-                    placeholder="Enter project number..." 
-                    value={formData.projectNumber}
-                    onChange={(e) => handleChange("projectNumber", e.target.value)}
-                    disabled={isLoading}
-                />
-            </Form.Group>
 
             {/* PROJECT NAME */}
             <Form.Group className="mb-2">
-                <Form.Label className="small fw-bold text-muted">PROJECT NAME</Form.Label>
+                <Form.Label className="small fw-bold text-muted d-flex justify-content-between">
+                    PROJECT NAME
+                </Form.Label>
                 <Form.Control 
                     size="sm" 
                     type="text" 
@@ -226,6 +215,7 @@ const CreateProject = ({ onProjectCreated }) => {
                     onChange={(e) => handleChange("name", e.target.value)}
                     disabled={isLoading}
                 />
+                <span className="text-danger ps-2" style={{fontSize: '0.65rem'}}>* REQUIRED</span>
             </Form.Group>
 
             {/* PROJECT LEAD */}
@@ -274,13 +264,42 @@ const CreateProject = ({ onProjectCreated }) => {
                 </Col>
             </Row>
 
+            {/* PROJECT NUMBER */}
+            <Form.Group className="mb-2">
+                <Form.Label className="small fw-bold text-muted d-flex justify-content-between">
+                    PROJECT NUMBER
+                </Form.Label>
+                <Form.Control 
+                    size="sm" 
+                    type="text" 
+                    placeholder="Enter project number..." 
+                    value={formData.projectNumber}
+                    onChange={(e) => handleChange("projectNumber", e.target.value)}
+                    disabled={isLoading}
+                />
+                {!formData.isServiceCall && <span className="text-danger ps-2" style={{fontSize: '0.65rem'}}>* REQUIRED</span>}
+                {formData.isServiceCall && <Form.Text className="text-muted ps-2" style={{fontSize: '0.65rem'}}>Optional for service calls</Form.Text>}
+            </Form.Group>
+
+            {/* SERVICE CALL TOGGLE */}
+            <Form.Group className="mb-3">
+                <Form.Check 
+                    type="checkbox"
+                    id="service-call-check"
+                    label={<span className="small fw-bold">This is a Service Call</span>}
+                    checked={formData.isServiceCall}
+                    onChange={(e) => handleChange("isServiceCall", e.target.checked)}
+                    disabled={isLoading}
+                />
+            </Form.Group>
+
             {/* SUBMIT BUTTON */}
             <Button 
                 variant="primary" 
                 size="sm" 
                 className="w-100 shadow-sm" 
                 onClick={handleCreate}
-                disabled={isLoading || !formData.name || !formData.projectNumber}
+                disabled={isLoading || !formData.name || (!formData.isServiceCall && !formData.projectNumber)}
             >
                 {isLoading ? (
                     <> {/* Loading spinner and text */}
