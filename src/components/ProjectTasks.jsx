@@ -282,7 +282,7 @@ const ProjectTasks = ({ project, onBack }) => {
                         <FontAwesomeIcon icon={faArrowLeft} />
                     </Button>
                     <div style={{lineHeight: "1.1"}}>
-                        <h6 className="m-0 fw-bold text-primary">{project.name}</h6>
+                        <h6 className="m-0 fw-bold text-primary">{project.projectNumber ? `[${project.projectNumber}] ` : ""}{project.name}</h6>
                         <small className="text-muted" style={{fontSize: "0.7rem"}}>Project {project.id} Task Manager</small> {/* Project ID is already a string */}
                     </div>
                 </div>

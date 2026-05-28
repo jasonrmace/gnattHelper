@@ -2,7 +2,7 @@
 import ProjectTasks from './ProjectTasks';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Button, Card, Badge, Spinner } from 'react-bootstrap';
+import { Button, Card, Badge, Spinner, Row, Col } from 'react-bootstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faLocationArrow, faListCheck, faChevronRight, faUser, faCalendarDays, faArrowRight, faSyncAlt } from '@fortawesome/free-solid-svg-icons';
 
@@ -77,7 +77,19 @@ const ProjectList = ({ refreshTrigger }) => {
                     return;
                 }
 
-                const dataRange = sheet.getRangeByIndexes(dataStartIndex, 0, rowCount, 8);
+                // Find Project Number Column (Dynamic Lookup in Row 7)
+                const headerRow = sheet.getRange("7:7");
+                const projNumHeader = headerRow.find("Project Number", { completeMatch: true, matchCase: false });
+                projNumHeader.load(["columnIndex", "isNullObject"]);
+                await context.sync();
+
+                let projNumIdx = 3; // Fallback to index 3 (Col D)
+                if (!projNumHeader.isNullObject) {
+                    projNumIdx = projNumHeader.columnIndex;
+                }
+
+                const colCountToFetch = Math.max(8, projNumIdx + 1);
+                const dataRange = sheet.getRangeByIndexes(dataStartIndex, 0, rowCount, colCountToFetch);
                 dataRange.load("text"); 
                 await context.sync();
 
@@ -96,6 +108,7 @@ const ProjectList = ({ refreshTrigger }) => {
                         const fullLeadName = teamMap[rawLead.toLowerCase()] || rawLead;
                         projectsMap.set(id, {
                             id: row[0], // Keep as string/raw to avoid float issues
+                            projectNumber: row[projNumIdx],
                             rowIndex: currentRowIndex,
                             name: row[1],
                             lead: fullLeadName,
@@ -154,23 +167,27 @@ const ProjectList = ({ refreshTrigger }) => {
                 {projects.map((p, index) => (
                     <Card key={index} className="mb-2 shadow-sm border-0">
                         <Card.Body className="p-2">
-                            <div className="d-flex justify-content-between align-items-start">
-                                <div className="d-flex align-items-center" style={{overflow: "hidden"}}>
-                                    <Badge bg="primary" className="me-2">#{p.id}</Badge>
-                                    <span className="fw-bold text-dark text-truncate" title={p.name}>
+                                <Row>
+                                    <Col xs="auto" className="">
+                                            <Badge bg="primary">#{p.id}</Badge>
+                                    </Col>
+                                    <Col className="fw-bold text-dark text-truncate p-0" title={p.name}>
                                         {p.name}
-                                    </span>
-                                </div>
-                                <div className="d-flex align-items-center flex-shrink-0 ms-2">
-                                    <Badge bg={p.percent === "100%" ? "success" : p.percent === "0%" ? "danger" : "warning"} pill className="me-2" style={{minWidth: "45px"}}>
-                                        {p.percent || "0%"}
-                                    </Badge>
-                                    <Button variant="light" size="sm" className="text-primary p-1 lh-1" onClick={() => handleJump(p.rowIndex)}>
-                                        <FontAwesomeIcon icon={faLocationArrow} />
-                                    </Button>
-                                </div>
-                            </div>
-                            
+                                    </Col>
+                                </Row>
+                                <Row>
+                                    <Col>
+                                        {p.projectNumber && <Badge bg="info" className="me-2 text-dark" style={{fontSize: "0.65rem"}} title="Project Number">{p.projectNumber}</Badge>}
+                                    </Col>
+                                    <Col xs="auto">
+                                        <Badge bg={p.percent === "100%" ? "success" : p.percent === "0%" ? "danger" : "warning"} pill className="me-2" style={{minWidth: "45px"}} title="Percent Complete">
+                                            {p.percent || "0%"}
+                                        </Badge>
+                                        <Button variant="light" size="sm" className="text-primary p-1 lh-1" onClick={() => handleJump(p.rowIndex)}>
+                                            <FontAwesomeIcon icon={faLocationArrow} />
+                                        </Button>
+                                    </Col>
+                                </Row>                            
                             <div className="mt-2 small text-muted">
                                 {/* Task Summary */}
                                 {/* CLICKABLE TASKS BUTTON */}

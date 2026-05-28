@@ -10,7 +10,7 @@ import { faFolderPlus } from '@fortawesome/free-solid-svg-icons';
 const CreateProject = ({ onProjectCreated }) => {
     // --- STATE ---
     const [teamMembers, setTeamMembers] = useState([]);
-    const [formData, setFormData] = useState({ name: "", lead: "", startDate: "", endDate: "" });
+    const [formData, setFormData] = useState({ name: "", lead: "", startDate: "", endDate: "", projectNumber: "" });
     const [status, setStatus] = useState({ msg: "", variant: "light" });
     const [isLoading, setIsLoading] = useState(false);
 
@@ -52,6 +52,10 @@ const CreateProject = ({ onProjectCreated }) => {
     const handleCreate = async () => {
         if (!formData.name) {
             setStatus({ msg: "Project Name is required.", variant: "danger" });
+            return;
+        }
+        if (!formData.projectNumber) {
+            setStatus({ msg: "Project Number is required.", variant: "danger" });
             return;
         }
         if (formData.startDate && formData.endDate && formData.startDate > formData.endDate) {
@@ -96,6 +100,17 @@ const CreateProject = ({ onProjectCreated }) => {
                 
                 const insertRowIndex = footerRange.rowIndex;
 
+                // D2. FIND PROJECT NUMBER COLUMN (Dynamic Lookup in Row 7)
+                const headerRow = sheet.getRange("7:7");
+                const projNumHeader = headerRow.find("Project Number", { completeMatch: true, matchCase: false });
+                projNumHeader.load(["columnIndex", "isNullObject"]);
+                await context.sync();
+
+                let projNumCol = 3; // Fallback to index 3 (Col D) if header not found
+                if (!projNumHeader.isNullObject) {
+                    projNumCol = projNumHeader.columnIndex;
+                }
+
                 // D. CALCULATE NEXT ID (Matches VBA Logic)
                 // Look at cell above footer. If numeric, add 1. Else 1.
                 const lastIdCell = sheet.getCell(insertRowIndex - 1, 0);
@@ -131,6 +146,13 @@ const CreateProject = ({ onProjectCreated }) => {
                 // Col B (Name)
                 sheet.getCell(insertRowIndex, 1).values = [[formData.name]];
                 
+                // Project Number (Dynamic Column)
+                if (formData.projectNumber) {
+                    sheet.getCell(insertRowIndex, projNumCol).values = [[formData.projectNumber]];
+                } else {
+                    sheet.getCell(insertRowIndex, projNumCol).clear(Excel.ClearApplyTo.contents);
+                }
+
                 // Col C (Lead)
                 if (formData.lead) {
                     sheet.getCell(insertRowIndex, 2).values = [[formData.lead]];
@@ -161,7 +183,7 @@ const CreateProject = ({ onProjectCreated }) => {
                 await context.sync();
 
                 setStatus({ msg: `Project "${formData.name}" (ID: ${newId}) Created!`, variant: "success" });
-                setFormData({ name: "", lead: "", startDate: "", endDate: "" });
+                setFormData({ name: "", lead: "", startDate: "", endDate: "", projectNumber: "" });
 
                 if (onProjectCreated) {
                     onProjectCreated();
@@ -180,6 +202,19 @@ const CreateProject = ({ onProjectCreated }) => {
         <div className="bg-light p-3 rounded mb-4 border" aria-label="New Project Form">
             <h6 className="fw-bold text-primary mb-3"><FontAwesomeIcon icon={faFolderPlus} className="me-2" />New Project</h6>
             
+            {/* PROJECT NUMBER */}
+            <Form.Group className="mb-2">
+                <Form.Label className="small fw-bold text-muted">PROJECT NUMBER</Form.Label>
+                <Form.Control 
+                    size="sm" 
+                    type="text" 
+                    placeholder="Enter project number..." 
+                    value={formData.projectNumber}
+                    onChange={(e) => handleChange("projectNumber", e.target.value)}
+                    disabled={isLoading}
+                />
+            </Form.Group>
+
             {/* PROJECT NAME */}
             <Form.Group className="mb-2">
                 <Form.Label className="small fw-bold text-muted">PROJECT NAME</Form.Label>
@@ -245,7 +280,7 @@ const CreateProject = ({ onProjectCreated }) => {
                 size="sm" 
                 className="w-100 shadow-sm" 
                 onClick={handleCreate}
-                disabled={isLoading || !formData.name}
+                disabled={isLoading || !formData.name || !formData.projectNumber}
             >
                 {isLoading ? (
                     <> {/* Loading spinner and text */}
