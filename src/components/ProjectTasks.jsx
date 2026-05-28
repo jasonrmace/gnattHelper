@@ -3,6 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { GanttLogic } from '../utils/ganttLogic';
 import { ChangelogLogic } from '../utils/changelogLogic';
 import { IdentityLogic } from '../utils/identityLogic';
+import { FormattingLogic } from '../utils/formattingLogic_v2';
+import { VisualLogic } from '../utils/visualLogic';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faArrowLeft, faFolderPlus, faClipboardList, faLocationArrow, faPlus, faPencil, faTrash, faUser, faCalendarDays, faArrowRight } from '@fortawesome/free-solid-svg-icons';
 import { Button, Card, Badge, Spinner, Modal, ButtonGroup, Form, Row, Col, Alert } from 'react-bootstrap';
@@ -222,6 +224,13 @@ const ProjectTasks = ({ project, onBack }) => {
                     }
                     newRow.select();
                 }
+
+                // TARGETED SYNC
+                const targetIndex = formMode === "edit" ? activeTask.rowIndex : insertRowIndex;
+                const rowGridRange = sheet.getRangeByIndexes(targetIndex, 10, 1, 365);
+                const rowNameRange = sheet.getRangeByIndexes(targetIndex, 2, 1, 1);
+                await FormattingLogic.applyRulesToRange(context, rowGridRange, rowNameRange);
+                await VisualLogic.refreshRange(context, targetIndex, 1);
 
                 // --- TRIGGER LOGIC ENGINE ---
                 await GanttLogic.updateProjectAverages(context);

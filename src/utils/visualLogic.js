@@ -9,12 +9,32 @@
 // ==============================================================================
 
 export const VisualLogic = {
+    /**
+     * Full refresh of all date alerts on the grid.
+     */
     refreshGridAlerts: async (context) => {
-        console.log("Visual Logic: Starting Grid Refresh (Phase 10 - Grammar)...");
-        
-        // 1. SHOW SPINNER
         if (window.GlobalLoader) window.GlobalLoader.show("Syncing Visuals...");
+        try {
+            const sheet = context.workbook.worksheets.getItem("GanttChart");
+            const footerRange = sheet.getRange("A:A").find("DO NOT DELETE", { completeMatch: false, matchCase: false });
+            footerRange.load("rowIndex");
+            await context.sync();
 
+            const startRow = 7; 
+            const rowCount = footerRange.rowIndex - startRow;
+
+            await VisualLogic.refreshRange(context, startRow, rowCount);
+        } catch (error) {
+            console.error(error);
+        } finally {
+            if (window.GlobalLoader) window.GlobalLoader.hide();
+        }
+    },
+
+    /**
+     * Targeted refresh for specific rows (e.g., a newly created project).
+     */
+    refreshRange: async (context, startRow, rowCount) => {
         try {
             const sheet = context.workbook.worksheets.getItem("GanttChart");
 
@@ -56,15 +76,6 @@ export const VisualLogic = {
                 ptoData.starts = rngStart.values.map(v => v[0]);
                 ptoData.days = rngDays.values.map(v => v[0]);
             }
-
-            // 2. SETUP GRID DIMENSIONS
-            const footerRange = sheet.getRange("A:A").find("DO NOT DELETE", { completeMatch: false, matchCase: false });
-            footerRange.load("rowIndex");
-            await context.sync();
-
-            const startRow = 7; // Row 8
-            const endRow = footerRange.rowIndex - 1;
-            const rowCount = endRow - startRow + 1;
 
             // Find Date Headers
             const dateRowIndex = 5; // Row 6

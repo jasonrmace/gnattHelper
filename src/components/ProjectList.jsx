@@ -6,13 +6,16 @@ import { Button, Card, Badge, Spinner, Row, Col } from 'react-bootstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faLocationArrow, faListCheck, faChevronRight, faUser, faCalendarDays, faArrowRight, faSyncAlt } from '@fortawesome/free-solid-svg-icons';
 
-const ProjectList = ({ refreshTrigger }) => {
+const ProjectList = ({ refreshTrigger, highlightId }) => {
     // --- STATE ---
     const [projects, setProjects] = useState([]);
     const [isFetching, setIsFetching] = useState(false);
     
     // VIEW STATE: Controls "List" vs "Detail" view
     const [selectedProject, setSelectedProject] = useState(null);
+
+    // Scrolling Ref
+    const projectRefs = useRef({});
 
     // Dynamic Height State
     const listContainerRef = useRef(null);
@@ -32,6 +35,16 @@ const ProjectList = ({ refreshTrigger }) => {
         window.addEventListener('resize', calculateHeight);
         return () => window.removeEventListener('resize', calculateHeight);
     }, [selectedProject]); 
+
+    // --- 2. SCROLL TO HIGHLIGHTED PROJECT ---
+    useEffect(() => {
+        if (highlightId && projectRefs.current[highlightId]) {
+            // Small timeout to ensure the list has finished rendering after a refresh
+            setTimeout(() => {
+                projectRefs.current[highlightId].scrollIntoView({ behavior: "smooth", block: "center" });
+            }, 500);
+        }
+    }, [highlightId, projects]);
 
     // --- 2. EXCEL ACTIONS ---
     const handleJump = async (rowIndex) => {
@@ -164,20 +177,28 @@ const ProjectList = ({ refreshTrigger }) => {
                 ref={listContainerRef}
                 style={{ maxHeight: listHeight, overflowY: "auto", transition: "max-height 0.1s ease-out" }}
             >
-                {projects.map((p, index) => (
-                    <Card key={index} className="mb-2 shadow-sm border-0">
-                        <Card.Body className="p-2">
+                {projects.map((p, index) => {
+                    const isNew = highlightId && String(p.id) === String(highlightId);
+                    return (
+                        <Card 
+                            key={index} 
+                            ref={el => (projectRefs.current[p.id] = el)}
+                            className={`mb-2 shadow-sm border-0 ${isNew ? 'border border-primary' : ''}`}
+                            style={isNew ? { backgroundColor: '#f0f7ff' } : {}}
+                        >
+                            <Card.Body className="py-2">
                                 <Row>
                                     <Col xs="auto" className="">
                                             <Badge bg="primary">#{p.id}</Badge>
                                     </Col>
-                                    <Col className="fw-bold text-dark text-truncate p-0" title={p.name}>
-                                        {p.name}
+                                    <Col className="fw-bold text-dark text-truncate p-0 d-flex align-items-center" title={p.name}>
+                                        <span className="text-truncate">{p.name}</span>
+                                        {isNew && <Badge bg="success" className="ms-2" style={{fontSize: '0.65rem'}}>NEW</Badge>}
                                     </Col>
                                 </Row>
                                 <Row>
                                     <Col>
-                                        {p.projectNumber && <Badge bg="info" className="me-2 text-dark" style={{fontSize: "0.65rem"}} title="Project Number">{p.projectNumber}</Badge>}
+                                        {p.projectNumber && <Badge bg="info" className="text-dark" style={{fontSize: "0.65rem"}} title="Project Number">{p.projectNumber}</Badge>}
                                     </Col>
                                     <Col xs="auto">
                                         <Badge bg={p.percent === "100%" ? "success" : p.percent === "0%" ? "danger" : "warning"} pill className="me-2" style={{minWidth: "45px"}} title="Percent Complete">
@@ -230,7 +251,8 @@ const ProjectList = ({ refreshTrigger }) => {
                             </div>
                         </Card.Body>
                     </Card>
-                ))}
+                    );
+                })}
             </div>
         </div>
     );

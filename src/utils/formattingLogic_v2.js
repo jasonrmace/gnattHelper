@@ -12,6 +12,10 @@
 // ==============================================================================
 
 export const FormattingLogic = {
+    /**
+     * Performs a full reset of the sheet formatting.
+     * Discovery logic for start/end rows stays here.
+     */
     generateSmartRules: async (context) => {
         console.log("Formatting Engine: Starting...");
         
@@ -48,17 +52,30 @@ export const FormattingLogic = {
             // 2. CLEAR OLD RULES & FORMATS
             console.log("STEP 1: Clearing Rules & Scrubbing Colors...");
             
+            // Clear all before full re-apply
             gridRange.conditionalFormats.clearAll();
             namesRange.conditionalFormats.clearAll();
-            
-            // Scrub manual formatting to prevent "Ghost Colors"
             gridRange.format.fill.clear();
             namesRange.format.fill.clear();
 
-            await context.sync(); 
-            console.log(">> Success. Grid is clean.");
+            await FormattingLogic.applyRulesToRange(context, gridRange, namesRange);
+        } catch (error) {
+            console.error("Formatting Logic Error:", error);
+        } finally {
+            if (window.GlobalLoader) window.GlobalLoader.hide();
+        }
+    },
 
-            // 3. LOAD TEAM COLORS
+    /**
+     * Applies logic to a SPECIFIC range without clearing existing rules elsewhere.
+     * Use this for new rows to ensure they inherit the Gantt behavior.
+     */
+    applyRulesToRange: async (context, gridRange, namesRange) => {
+        try {
+            const sheet = context.workbook.worksheets.getItem("GanttChart");
+            const teamSheet = context.workbook.worksheets.getItem("Team");
+
+            // LOAD TEAM COLORS
             console.log("STEP 2: Fetching Colors...");
             let teamRules = [];
             const teamTable = teamSheet.tables.getItem("Team");

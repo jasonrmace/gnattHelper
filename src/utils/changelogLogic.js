@@ -5,17 +5,27 @@ export const ChangelogLogic = {
     // 1. LOG A NEW CHANGE
     logChange: async (context, changeDescription) => {
         try {
-            const table = context.workbook.tables.getItemOrNullObject("changelog");
+            // Try lowercase then capitalized to handle case sensitivity
+            let table = context.workbook.tables.getItemOrNullObject("changelog");
+            table.load("isNullObject");
+            await context.sync();
+
+            if (table.isNullObject) {
+                table = context.workbook.tables.getItemOrNullObject("Changelog");
+                table.load("isNullObject");
+                await context.sync();
+            }
+
             const user = IdentityLogic.getIdentity() || "Unknown";
             const now = new Date().toLocaleString();
             
-            table.load(["isNullObject", "columns/items/name"]);
-            await context.sync();
-
             if (table.isNullObject) {
                 console.warn("Changelog table not found. Skipping log.");
                 return;
             }
+            
+            table.columns.load("items/name");
+            await context.sync();
 
             // Build a dynamic map of column names to indices
             const colMap = {};
@@ -30,6 +40,7 @@ export const ChangelogLogic = {
             if (colMap["Date/Time"] !== undefined) rowData[colMap["Date/Time"]] = now;
 
             table.rows.add(null, [rowData]);
+            await context.sync();
         } catch (error) {
             console.error("Log Change Error:", error);
         }

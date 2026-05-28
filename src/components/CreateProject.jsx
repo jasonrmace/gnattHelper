@@ -4,6 +4,8 @@ import { Button, Form, Spinner, Row, Col, Alert } from 'react-bootstrap';
 
 import { GanttLogic } from '../utils/ganttLogic';
 import { ChangelogLogic } from '../utils/changelogLogic';
+import { FormattingLogic } from '../utils/formattingLogic_v2';
+import { VisualLogic } from '../utils/visualLogic';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faFolderPlus } from '@fortawesome/free-solid-svg-icons';
 
@@ -66,6 +68,7 @@ const CreateProject = ({ onProjectCreated }) => {
         setIsLoading(true);
         setStatus({ msg: "Processing...", variant: "primary" });
 
+        let createdId = null;
         try {
             await Excel.run(async (context) => {
                 const sheet = context.workbook.worksheets.getItem("GanttChart");
@@ -122,6 +125,7 @@ const CreateProject = ({ onProjectCreated }) => {
                 if (!isNaN(lastVal) && lastVal !== "") {
                     newId = Math.floor(lastVal) + 1;
                 }
+                createdId = newId;
 
                 // E. INSERT ROW & COPY TEMPLATE
                 const insertRange = sheet.getRange(`${insertRowIndex + 1}:${insertRowIndex + 1}`);
@@ -174,6 +178,12 @@ const CreateProject = ({ onProjectCreated }) => {
                 // Ensures internal formulas are correct immediately
                 await GanttLogic.updateProjectAverages(context);
 
+                // J. TARGETED FORMATTING & VISUALS
+                const newGridRange = sheet.getRangeByIndexes(insertRowIndex, 10, 1, 365);
+                const newNameRange = sheet.getRangeByIndexes(insertRowIndex, 2, 1, 1);
+                await FormattingLogic.applyRulesToRange(context, newGridRange, newNameRange);
+                await VisualLogic.refreshRange(context, insertRowIndex, 1);
+
                 // Record the change
                 await ChangelogLogic.logChange(context, `Created Project: ${formData.name} (ID: ${newId})`);
 
@@ -184,11 +194,12 @@ const CreateProject = ({ onProjectCreated }) => {
 
                 setStatus({ msg: `Project "${formData.name}" (ID: ${newId}) Created!`, variant: "success" });
                 setFormData({ name: "", lead: "", startDate: "", endDate: "", projectNumber: "", isServiceCall: false });
-
-                if (onProjectCreated) {
-                    onProjectCreated();
-                }
             });
+
+            // Trigger refresh AFTER the Excel.run transaction is fully complete
+            if (onProjectCreated) {
+                onProjectCreated(createdId);
+            }
         } catch (error) {
             console.error(error);
             setStatus({ msg: error.message, variant: "danger" });

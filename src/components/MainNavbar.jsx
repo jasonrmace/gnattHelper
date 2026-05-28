@@ -12,14 +12,18 @@ const MainNavbar = ({ activeTab, setActiveTab, isFileValid, unseenCount }) => {
     const [expanded, setExpanded] = useState(false);
     const [isSyncing, setIsSyncing] = useState(false);
 
-    const handleLayoutChange = (newState) => {
-        setExpanded(newState);
+    const triggerResizeLoop = () => {
         let count = 0;
         const interval = setInterval(() => {
             window.dispatchEvent(new Event('resize'));
             count++;
-            if (count > 20) clearInterval(interval);
+            if (count > 25) clearInterval(interval);
         }, 20);
+    };
+
+    const handleLayoutChange = (newState) => {
+        setExpanded(newState);
+        triggerResizeLoop();
     };
 
     // --- 1. TRIGGER GRID ALERTS (VisualLogic) ---
@@ -27,7 +31,6 @@ const MainNavbar = ({ activeTab, setActiveTab, isFileValid, unseenCount }) => {
         if (isSyncing) return;
         setIsSyncing(true);
         try {
-            if (window.GlobalLoader) window.GlobalLoader.show("Syncing Visuals...");
             await Excel.run(async (context) => {
                 await VisualLogic.refreshGridAlerts(context);
             });
@@ -35,7 +38,6 @@ const MainNavbar = ({ activeTab, setActiveTab, isFileValid, unseenCount }) => {
         } catch (e) {
             console.error(e);
         } finally {
-            if (window.GlobalLoader) window.GlobalLoader.hide();
             setIsSyncing(false);
             setExpanded(false);
         }
@@ -46,7 +48,6 @@ const MainNavbar = ({ activeTab, setActiveTab, isFileValid, unseenCount }) => {
         if (isSyncing) return;
         setIsSyncing(true);
         try {
-            if (window.GlobalLoader) window.GlobalLoader.show("Resetting Rules...");
             await Excel.run(async (context) => {
                 await FormattingLogic.generateSmartRules(context);
             });
@@ -54,7 +55,6 @@ const MainNavbar = ({ activeTab, setActiveTab, isFileValid, unseenCount }) => {
         } catch (e) {
             console.error(e);
         } finally {
-            if (window.GlobalLoader) window.GlobalLoader.hide();
             setIsSyncing(false);
             setExpanded(false);
         }
@@ -104,6 +104,7 @@ const MainNavbar = ({ activeTab, setActiveTab, isFileValid, unseenCount }) => {
                         } 
                         id="user-nav-dropdown"
                         className="me-2 no-caret"
+                        onToggle={() => triggerResizeLoop()}
                     >
                         <NavDropdown.Item eventKey="Updates" className="d-flex justify-content-between align-items-center">
                             <span><FontAwesomeIcon icon={faCodeCompare} className="me-2 text-muted" />Change History</span>
@@ -125,7 +126,11 @@ const MainNavbar = ({ activeTab, setActiveTab, isFileValid, unseenCount }) => {
                             <Nav.Link eventKey="ProjectList">Active Projects</Nav.Link>
                             <Nav.Link eventKey="AddProject">Add a New Project</Nav.Link>
                             
-                            <NavDropdown title="Options" id="basic-nav-dropdown">
+                            <NavDropdown 
+                                title="Options" 
+                                id="basic-nav-dropdown" 
+                                onToggle={() => triggerResizeLoop()}
+                            >
                                 {/* ACTION 1: GRID ALERTS */}
                                 <NavDropdown.Item onClick={handleRefreshVisuals} disabled={isSyncing} aria-label="Refresh Grid Alerts">
                                     <FontAwesomeIcon icon={faBell} className="me-2 text-muted" /> 

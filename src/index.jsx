@@ -41,13 +41,14 @@ const LoadingOverlay = ({ isVisible, message }) => {
 
 function App() {
     // --- STATE ---
-    const [version] = useState("v5.12.2"); 
+    const [version] = useState("v5.12.5"); 
     const [activeTab, setActiveTab] = useState("ProjectList");
     const [isValidFile, setIsValidFile] = useState(true);
     const [currentName, setCurrentName] = useState("");
     const [hudText, setHudText] = useState("Ready");
     const [refreshTrigger, setRefreshTrigger] = useState(0);
     const [fileError, setFileError] = useState("");
+    const [highlightId, setHighlightId] = useState(null);
     const [unseenCount, setUnseenCount] = useState(0);
     
     // LOADER & MODAL STATE
@@ -68,6 +69,14 @@ function App() {
     // --- HELPER: TRIGGER LIST REFRESH ---
     const triggerRefresh = () => {
         setRefreshTrigger(prev => prev + 1);
+    };
+
+    const handleProjectCreated = (newId) => {
+        setHighlightId(newId);
+        setActiveTab("ProjectList");
+        triggerRefresh();
+        // Clear highlight after 10 seconds so it doesn't persist forever
+        setTimeout(() => setHighlightId(null), 10000);
     };
 
     const fetchUnseenCount = async () => {
@@ -352,7 +361,7 @@ function App() {
             </div>
 
             {/* 2. BODY */}
-            <div className="flex-grow-1 overflow-auto p-3">
+            <div className={`flex-grow-1 p-3 ${activeTab === "ProjectList" ? "overflow-hidden" : "overflow-auto"}`}>
                 {!isValidFile ? (
                     <div className="mt-5 px-2">
                         <Alert variant="warning" className="shadow-sm border-warning text-center py-4">
@@ -365,8 +374,8 @@ function App() {
                     </div>
                 ) : (
                     <>
-                        {activeTab === "ProjectList" && <ProjectList refreshTrigger={refreshTrigger} />}
-                        {activeTab === "AddProject" && <CreateProject onProjectCreated={triggerRefresh} />}
+                        {activeTab === "ProjectList" && <ProjectList refreshTrigger={refreshTrigger} highlightId={highlightId} />}
+                        {activeTab === "AddProject" && <CreateProject onProjectCreated={handleProjectCreated} />}
                         {activeTab === "Settings" && <SettingsPage />} 
                         {activeTab === "Updates" && <UpdatesPage onMarkedSeen={() => setUnseenCount(0)} />}
                     </>
