@@ -1,87 +1,88 @@
-/* global React, ReactBootstrap */
-import React, { useState, useEffect }from 'react';
-import { Container, Form, Button, Alert, Spinner, Card } from 'react-bootstrap';
-
+import React, { useState, useEffect } from 'react';
+import { Container, Card, Form, Button, Alert } from 'react-bootstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faUserCog, faCheckCircle } from '@fortawesome/free-solid-svg-icons';
+import { faUserCog, faUserCircle } from '@fortawesome/free-solid-svg-icons';
 import { IdentityLogic } from '../utils/identityLogic';
 
-const SettingsPage = () => {
-    const [teamList, setTeamList] = useState([]);
-    const [selectedUser, setSelectedUser] = useState("");
-    const [isLoading, setIsLoading] = useState(true);
+const GANTT_MAIN_FILE = "Houston Summer 2026.xlsx";
+
+const SettingsPage = ({ currentFileName }) => {
+    const [currentIdentity, setCurrentIdentity] = useState('');
+    const [teamMembers, setTeamMembers] = useState([]);
+    const [selectedIdentity, setSelectedIdentity] = useState('');
     const [showSuccess, setShowSuccess] = useState(false);
 
-    // 1. Load Data on Mount
-    useEffect(() => {
-        const loadData = async () => {
-            // A. Fetch Team Members (Now returns { first, full })
-            const members = await IdentityLogic.fetchTeamMembers();
-            setTeamList(members);
+    const canChangeIdentity = currentFileName === GANTT_MAIN_FILE;
 
-            // B. Get Current Saved Identity
-            const current = IdentityLogic.getIdentity();
-            if (current) setSelectedUser(current);
-            
-            setIsLoading(false);
+    useEffect(() => {
+        const fetchSettings = async () => {
+            const identity = IdentityLogic.getIdentity();
+            setCurrentIdentity(identity || 'Not set');
+            setSelectedIdentity(identity || '');
+
+            const members = await IdentityLogic.fetchTeamMembers();
+            setTeamMembers(members);
         };
-        loadData();
+        fetchSettings();
     }, []);
 
-    // 2. Handle Save
-    const handleSave = () => {
-        IdentityLogic.setIdentity(selectedUser);
-        setShowSuccess(true);
-        
-        // Hide success message after 3 seconds
-        setTimeout(() => setShowSuccess(false), 3000);
+    const handleIdentityChange = (e) => {
+        setSelectedIdentity(e.target.value);
     };
 
-    if (isLoading) {
-        return (
-            <Container className="text-center mt-5">
-                <Spinner animation="border" variant="primary" />
-                <p className="mt-2 text-muted">Loading Team Data...</p>
-            </Container>
-        );
-    }
+    const handleSaveIdentity = () => {
+        if (selectedIdentity) {
+            IdentityLogic.setIdentity(selectedIdentity);
+            setCurrentIdentity(selectedIdentity);
+            setShowSuccess(true);
+            window.GlobalToast.success(`Identity updated to ${selectedIdentity}!`);
+            setTimeout(() => setShowSuccess(false), 3000);
+        }
+    };
 
     return (
-        <Container className="mt-4" aria-label="User Settings Page">
-            <h4 className="mb-4"><FontAwesomeIcon icon={faUserCog} className="me-2" /> User Settings</h4>
-            
+        <Container className="mt-4">
             <Card className="shadow-sm">
                 <Card.Body>
-                    <Form>
-                        <Form.Group className="mb-3">
-                            <Form.Label className="fw-bold">Who are you?</Form.Label>
-                            <Form.Text className="text-muted d-block mb-2">
+                    <h5 className="text-primary fw-bold mb-3"><FontAwesomeIcon icon={faUserCog} className="me-2" />User Settings</h5>
+
+                    <Form.Group className="mb-4">
+                        <Form.Label className="small fw-bold text-muted">WHO ARE YOU?</Form.Label>
+                        <Form.Text className="text-muted d-block mb-2">
                                 Identifying yourself allows the tool to highlight your specific tasks and handle your permissions.
                             </Form.Text>
+                        
+                        <Form.Select
+                            size="sm"
+                            value={selectedIdentity || ""}
+                            onChange={handleIdentityChange}
+                            disabled={!canChangeIdentity}
+                        >
+                            {!selectedIdentity && <option value="">Select your name...</option>}
                             
-                            <Form.Select 
-                                value={selectedUser} 
-                                onChange={(e) => setSelectedUser(e.target.value)}
-                            >
-                                <option value="">-- Select Your Name --</option>
-                                {teamList.map((m, index) => (
-                                    <option key={index} value={m.first}>{m.full}</option>
-                                ))}
-                            </Form.Select>
-                        </Form.Group>
+                            {/* Show the stored identity even if the Team list hasn't loaded or doesn't exist in this file */}
+                            {selectedIdentity && !teamMembers.some(m => m.first === selectedIdentity) && (
+                                <option value={selectedIdentity}>{selectedIdentity}</option>
+                            )}
 
-                        {showSuccess && (
-                            <Alert variant="success" className="py-2">
-                                <FontAwesomeIcon icon={faCheckCircle} className="me-2" /> Identity Saved!
+                            {teamMembers.map((member, idx) => (
+                                <option key={idx} value={member.first}>
+                                    {member.full}
+                                </option>
+                            ))}
+                        </Form.Select>
+                        {!canChangeIdentity && (
+                            <Alert variant="info" className="mt-2 small">
+                                You must load the file "Houston Summer 2026.xlsx" in order to change your identity. Ability to change in this file, coming soon!
                             </Alert>
                         )}
-
-                        <div className="d-grid gap-2">
-                            <Button variant="primary" onClick={handleSave} disabled={!selectedUser}>
-                                Save Identity
-                            </Button>
-                        </div>
-                    </Form>
+                        <Button variant="primary" size="sm" className="mt-2" onClick={handleSaveIdentity} disabled={!canChangeIdentity || !selectedIdentity}>Save Identity</Button>
+                        {showSuccess && (
+                            <div className="text-success small mt-2 fw-bold text-center">
+                                Identity Saved!
+                            </div>
+                        )}
+                    </Form.Group>
                 </Card.Body>
             </Card>
 

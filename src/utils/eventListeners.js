@@ -82,7 +82,25 @@ async function handleGanttChange(event) {
     if (event.source === Excel.EventSource.remote) {
         if (window.RefreshBadge) window.RefreshBadge();
     }
-    // We skip the logic engines here to keep the UI snappy during editing.
+
+      // EXIT: If this is a standard cell edit (RangeEdited), we ignore it.
+    // We only trigger the heavy logic if a project/task row was inserted or deleted.
+    if (event.changeType !== "RowInserted" && event.changeType !== "RowDeleted") {
+        return;
+    }
+
+    console.log(`Structural change detected (${event.changeType}). Syncing Grid...`);
+
+     // Reuse the debounce logic to handle bulk inserts smoothly
+    if (debounceTimer) clearTimeout(debounceTimer);
+
+     debounceTimer = setTimeout(async () => {
+        await Excel.run(async (context) => {
+            // Re-apply everything because indices have shifted
+            await FormattingLogic.generateSmartRules(context);
+            await VisualLogic.refreshGridAlerts(context);
+        });
+    }, 1000);
 }
 
 // --- HANDLER 2: METADATA CHANGES (Debounced Global Refresh) ---

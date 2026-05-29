@@ -9,6 +9,7 @@ import { faSpinner, faBell, faTimes, faCrosshairs, faUserCircle } from '@fortawe
 import { IdentityLogic } from './utils/identityLogic';
 import { EventListeners } from './utils/eventListeners';
 import { ChangelogLogic } from './utils/changelogLogic';
+import { TimecardLogic } from './utils/timecardLogic.jsx';
 import ProjectList from './components/ProjectList';
 import CreateProject from './components/CreateProject';
 // Assuming these will also be converted to ES modules soon:
@@ -16,9 +17,12 @@ import MainNavbar from './components/MainNavbar';
 import SettingsPage from './components/SettingsPage';
 import IdentityModal from './components/IdentityModal';
 import UpdatesPage from './components/UpdatesPage';
+import TimecardView from './components/TimecardView';
+import CreateTimecardModal from './components/CreateTimecardModal';
 
 // 1. CONFIGURATION
-const ALLOWED_FILENAMES = ["Houston Summer 2026 [Macros].xlsm", "Houston Summer 2026.xlsx"];
+const GANTT_FILENAMES = ["Houston Summer 2026 [Macros].xlsm", "Houston Summer 2026.xlsx"];
+const TIMECARD_PREFIX = "2026_Timecard_Template_";
 
 // --- GLOBAL LOADING OVERLAY ---
 const LoadingOverlay = ({ isVisible, message }) => {
@@ -41,7 +45,7 @@ const LoadingOverlay = ({ isVisible, message }) => {
 
 function App() {
     // --- STATE ---
-    const [version] = useState("v5.12.5"); 
+    const [version] = useState("v5.13.0"); 
     const [activeTab, setActiveTab] = useState("ProjectList");
     const [isValidFile, setIsValidFile] = useState(true);
     const [currentName, setCurrentName] = useState("");
@@ -49,14 +53,17 @@ function App() {
     const [refreshTrigger, setRefreshTrigger] = useState(0);
     const [fileError, setFileError] = useState("");
     const [highlightId, setHighlightId] = useState(null);
+    const [fileType, setFileType] = useState(null); // 'gantt' or 'timecard'
     const [unseenCount, setUnseenCount] = useState(0);
     
     // LOADER & MODAL STATE
     const [isLoading, setIsLoading] = useState(false);
     const [loadingMsg, setLoadingMsg] = useState("Processing...");
     const [showIdentityModal, setShowIdentityModal] = useState(false);
+    const [showCreateTimecardModal, setShowCreateTimecardModal] = useState(false);
     
     const processingRef = useRef(false);
+    const timecardCheckRef = useRef(false);
 
     // --- HELPER: TRIGGER TOAST ---
     const showToast = (title, msg) => {
@@ -68,7 +75,12 @@ function App() {
 
     // --- HELPER: TRIGGER LIST REFRESH ---
     const triggerRefresh = () => {
-        setRefreshTrigger(prev => prev + 1);
+        // We add a small delay to allow Excel to finalize worksheet collection 
+        // updates before we attempt to re-read them in our components.
+        console.log("Triggering Refresh (1s delay)...");
+        setTimeout(() => {
+            setRefreshTrigger(prev => prev + 1);
+        }, 1000);
     };
 
     const handleProjectCreated = (newId) => {
@@ -111,6 +123,11 @@ function App() {
             error: (msg, opts) => toast.error(msg, opts),
             info: (msg, opts) => toast(msg, { icon: '🔄', ...opts }),
         };
+
+        // Expose refresh globally so utility files can trigger UI updates
+        window.GlobalRefresh = () => {
+            triggerRefresh();
+        };
     }, []);
 
     // --- INITIALIZATION & EVENTS ---
@@ -133,7 +150,10 @@ function App() {
                 const fileName = decodedUrl.substring(decodedUrl.lastIndexOf('/') + 1);
                 setCurrentName(fileName);
 
-                const isAllowed = ALLOWED_FILENAMES.includes(fileName);
+                const isGantt = GANTT_FILENAMES.includes(fileName);
+                const isTimecard = fileName.startsWith(TIMECARD_PREFIX);
+                const isAllowed = isGantt || isTimecard;
+
                 setIsValidFile(isAllowed);
 
                 // A. Register HUD Selection Listener
@@ -142,103 +162,119 @@ function App() {
                     handleSelectionChange
                 );
 
-                // B. Register Watchdog
                 if (!isAllowed) {
                     setFileError(`Helpers are locked for "${fileName}". Please open an approved Houston template.`);
                     setHudText("Locked");
                     return;
                 }
 
-                // Continue initialization only if file is allowed
-                await EventListeners.register();
+                if (isGantt) {
+                    setFileType('gantt');
+                    // B. Register Watchdog
+                    await EventListeners.register();
 
-                // D. Check for missed changes while user was away (including Admin specific ones)
-                const { count, adminLogs } = await Excel.run(async (context) => {
-                    const c = await ChangelogLogic.getUnseenCount(context);
-                    const al = await ChangelogLogic.getUnseenAdminLogs(context);
-                    return { count: c, adminLogs: al };
-                });
-                setUnseenCount(count);
+                    // D. Check for missed changes while user was away (including Admin specific ones)
+                    const { count, adminLogs } = await Excel.run(async (context) => {
+                        const c = await ChangelogLogic.getUnseenCount(context);
+                        const al = await ChangelogLogic.getUnseenAdminLogs(context);
+                        return { count: c, adminLogs: al };
+                    });
+                    setUnseenCount(count);
 
-                // Show individual toasts for Admin updates
-                adminLogs.forEach(log => {
-                    toast.custom((t) => (
-                        <div className={`${t.visible ? 'animate-enter' : 'animate-leave'} bg-white shadow-lg rounded-lg pointer-events-auto d-flex border border-info`}
-                             style={{ minWidth: '350px' }}>
-                            <div className="flex-grow-1 p-4">
-                                <div className="d-flex align-items-start h-100">
-                                    <FontAwesomeIcon icon={faBell} className="text-info mt-1" />
-                                    <div className="ms-3">
-                                        <p className="text-sm font-bold text-dark mb-1" style={{ fontSize: '0.9rem' }}>
-                                            New Administrative Update
-                                        </p>
-                                        <p className="text-sm text-muted mb-0" style={{ fontSize: '0.85rem' }}>
-                                            {log.change}
-                                        </p>
+                    // Show individual toasts for Admin updates
+                    adminLogs.forEach(log => {
+                        toast.custom((t) => (
+                            <div className={`${t.visible ? 'animate-enter' : 'animate-leave'} bg-white shadow-lg rounded-lg pointer-events-auto d-flex border border-info`}
+                                 style={{ minWidth: '350px' }}>
+                                <div className="flex-grow-1 p-4">
+                                    <div className="d-flex align-items-start h-100">
+                                        <FontAwesomeIcon icon={faBell} className="text-info mt-1" />
+                                        <div className="ms-3">
+                                            <p className="text-sm font-bold text-dark mb-1" style={{ fontSize: '0.9rem' }}>
+                                                New Administrative Update
+                                            </p>
+                                            <p className="text-sm text-muted mb-0" style={{ fontSize: '0.85rem' }}>
+                                                {log.change}
+                                            </p>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                            <div className="d-flex border-start border-light align-items-stretch">
-                                <button
-                                    onClick={async () => {
-                                        await ChangelogLogic.markAsSeen(log.change, log.timestamp);
-                                        toast.dismiss(t.id);
-                                        // Refresh the badge count
-                                        fetchUnseenCount();
-                                    }}
-                                    className="btn btn-link text-decoration-none border-0 px-4 py-0 d-flex align-items-center justify-content-center text-sm font-bold text-info hover:bg-light focus:outline-none"
-                                    style={{ borderRadius: '0 8px 8px 0', fontSize: '0.85rem' }}
-                                >
-                                    Close
-                                </button>
-                            </div>
-                        </div>
-                    ), { 
-                        duration: Infinity, 
-                        id: `admin-update-${log.timestamp}` 
-                    });
-                });
-
-                // Show summary toast if there are missed updates
-                const nonAdminCount = count - adminLogs.length;
-                if (nonAdminCount > 0) {
-                    toast.custom((t) => (
-                        <div className={`${t.visible ? 'animate-enter' : 'animate-leave'} bg-white shadow-lg rounded-lg pointer-events-auto d-flex border border-light`}
-                             style={{ minWidth: '350px' }}>
-                            <div className="flex-grow-1 p-4">
-                                <div className="d-flex align-items-start h-100">
-                                    <FontAwesomeIcon icon={faBell} className="text-primary mt-1" />
-                                    <div className="ms-3">
-                                        <p className="text-sm font-medium text-dark mb-1" style={{ fontSize: '0.9rem' }}>
-                                            You have missed {nonAdminCount} {nonAdminCount === 1 ? 'update' : 'updates'}.
-                        </p>
-                                        <button 
-                                            className="btn btn-link p-0 border-0 fw-bold text-primary"
-                                            style={{ textDecoration: 'underline', fontSize: '0.85rem' }}
-                                            onClick={() => {
-                                                setActiveTab("Updates");
-                                                toast.dismiss(t.id);
-                                            }}
-                                        >
-                                            View history here
-                                        </button>
-                                    </div>
+                                <div className="d-flex border-start border-light align-items-stretch">
+                                    <button
+                                        onClick={async () => {
+                                            await ChangelogLogic.markAsSeen(log.change, log.timestamp);
+                                            toast.dismiss(t.id);
+                                            // Refresh the badge count
+                                            fetchUnseenCount();
+                                        }}
+                                        className="btn btn-link text-decoration-none border-0 px-4 py-0 d-flex align-items-center justify-content-center text-sm font-bold text-info hover:bg-light focus:outline-none"
+                                        style={{ borderRadius: '0 8px 8px 0', fontSize: '0.85rem' }}
+                                    >
+                                        Close
+                                    </button>
                                 </div>
                             </div>
-                            <div className="d-flex border-start border-light align-items-stretch">
-                                <button
-                                    onClick={() => toast.dismiss(t.id)}
-                                    className="btn btn-link text-decoration-none border-0 px-4 py-0 d-flex align-items-center justify-content-center text-sm font-bold text-muted hover:bg-light focus:outline-none"
-                                    style={{ borderRadius: '0 8px 8px 0', fontSize: '0.85rem' }}
-                                >
-                                    Close
-                                </button>
-                            </div>
-                        </div>
-                    ), { 
-                        duration: 20000,
-                        id: 'startup-unseen-summary'
+                        ), { 
+                            duration: Infinity, 
+                            id: `admin-update-${log.timestamp}` 
+                        });
                     });
+
+                    // Show summary toast if there are missed updates
+                    const nonAdminCount = count - adminLogs.length;
+                    if (nonAdminCount > 0) {
+                        toast.custom((t) => (
+                            <div className={`${t.visible ? 'animate-enter' : 'animate-leave'} bg-white shadow-lg rounded-lg pointer-events-auto d-flex border border-light`}
+                                 style={{ minWidth: '350px' }}>
+                                <div className="flex-grow-1 p-4">
+                                    <div className="d-flex align-items-start h-100">
+                                        <FontAwesomeIcon icon={faBell} className="text-primary mt-1" />
+                                        <div className="ms-3">
+                                            <p className="text-sm font-medium text-dark mb-1" style={{ fontSize: '0.9rem' }}>
+                                                You have missed {nonAdminCount} {nonAdminCount === 1 ? 'update' : 'updates'}.
+                            </p>
+                                            <button 
+                                                className="btn btn-link p-0 border-0 fw-bold text-primary"
+                                                style={{ textDecoration: 'underline', fontSize: '0.85rem' }}
+                                                onClick={() => {
+                                                    setActiveTab("Updates");
+                                                    toast.dismiss(t.id);
+                                                }}
+                                            >
+                                                View history here
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="d-flex border-start border-light align-items-stretch">
+                                    <button
+                                        onClick={() => toast.dismiss(t.id)}
+                                        className="btn btn-link text-decoration-none border-0 px-4 py-0 d-flex align-items-center justify-content-center text-sm font-bold text-muted hover:bg-light focus:outline-none"
+                                        style={{ borderRadius: '0 8px 8px 0', fontSize: '0.85rem' }}
+                                    >
+                                        Close
+                                    </button>
+                                </div>
+                            </div>
+                        ), { 
+                            duration: 20000,
+                            id: 'startup-unseen-summary'
+                        });
+                    }
+                } else if (isTimecard) {
+                    setFileType('timecard');
+                    setActiveTab("TimecardDashboard");
+                    
+                    // Trigger the auto-generation check for next period (only once)
+                    if (!timecardCheckRef.current) {
+                        timecardCheckRef.current = true;
+                        // The logic returns true if a new sheet was actually created
+                        TimecardLogic.checkAndGenerateNextPeriod().then(created => {
+                            if (created) {
+                                triggerRefresh();
+                            }
+                        });
+                    }
                 }
 
                 // C. CHECK IDENTITY
@@ -349,6 +385,12 @@ function App() {
                 onHide={handleModalClose} 
             />
 
+                <CreateTimecardModal 
+                    show={showCreateTimecardModal}
+                    onHide={() => setShowCreateTimecardModal(false)}
+                    onCreated={() => triggerRefresh()}
+                />
+
             {/* 1. HEADER */}
             <div className="flex-shrink-0">
                 <MainNavbar 
@@ -356,6 +398,8 @@ function App() {
                     setActiveTab={setActiveTab} 
                     isFileValid={isValidFile} 
                     unseenCount={unseenCount}
+                    fileType={fileType}
+                    onAddTimecard={() => setShowCreateTimecardModal(true)}
                     onUpdatesViewed={() => setUnseenCount(0)}
                 />
             </div>
@@ -376,7 +420,8 @@ function App() {
                     <>
                         {activeTab === "ProjectList" && <ProjectList refreshTrigger={refreshTrigger} highlightId={highlightId} />}
                         {activeTab === "AddProject" && <CreateProject onProjectCreated={handleProjectCreated} />}
-                        {activeTab === "Settings" && <SettingsPage />} 
+                        {activeTab === "TimecardDashboard" && <TimecardView currentFileName={currentName} refreshTrigger={refreshTrigger} />}
+                        {activeTab === "Settings" && <SettingsPage currentFileName={currentName} />} 
                         {activeTab === "Updates" && <UpdatesPage onMarkedSeen={() => setUnseenCount(0)} />}
                     </>
                 )}
@@ -385,14 +430,16 @@ function App() {
             {/* 3. FOOTER */}
             <div className="bg-primary text-white shadow-lg px-3 py-2 d-flex justify-content-between align-items-center flex-shrink-0" 
                  style={{ fontSize: "0.8rem", borderTop: "3px solid #0d6efd", zIndex: 1030 }}>
-                
-                <span 
-                    className="fw-bold text-truncate" 
-                    style={{maxWidth: "80%", cursor: "help"}} 
-                    title={hudText} // Tooltip for the HUD text
-                >
-                    <FontAwesomeIcon icon={faCrosshairs} className="me-2 opacity-50" /> {hudText}
-                </span>
+
+                {fileType === 'gantt' ? (
+                    <span 
+                        className="fw-bold text-truncate" 
+                        style={{maxWidth: "80%", cursor: "help"}} 
+                        title={hudText} // Tooltip for the HUD text
+                    >
+                        <FontAwesomeIcon icon={faCrosshairs} className="me-2 opacity-50" /> {hudText}
+                    </span>
+                ) : <div />}
 
                 <span className="opacity-50" style={{fontSize: "0.7rem"}}>{version}</span>
             </div>

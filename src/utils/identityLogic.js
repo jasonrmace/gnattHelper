@@ -3,6 +3,7 @@
 // ==============================================================================
 // IDENTITY LOGIC ENGINE (Phase 3: Full Name Support)
 // Purpose: Manages "Who am I?" state using LocalStorage.
+// Note: LocalStorage is shared across all Excel files using this add-in on this machine.
 // CHANGE: Now exports a module instead of attaching to window.
 // ==============================================================================
 

@@ -88,12 +88,15 @@ export const VisualLogic = {
 
             const dates = headerRange.values[0];
 
-            // 3. BATCH UPDATE COLUMNS
-            console.log(`Visual Logic: Scanning ${colCount} days...`);
+            // 3. OPTIMIZED UPDATE
+            console.log(`Visual Logic: Updating ${rowCount} rows across ${colCount} days...`);
+
+            // Pre-clear all validation in the target range to avoid per-cell clearing
+            const fullTargetRange = sheet.getRangeByIndexes(startRow, startColIndex, rowCount, colCount);
+            fullTargetRange.dataValidation.clear();
 
             for (let c = 0; c < dates.length; c++) {
                 const serialDate = dates[c];
-                
                 if (typeof serialDate === 'number') {
                     let title = "";
                     let message = "";
@@ -143,7 +146,6 @@ export const VisualLogic = {
                     const colStrip = sheet.getRangeByIndexes(startRow, startColIndex + c, rowCount, 1);
 
                     // A. Apply Data Validation (Popup)
-                    colStrip.dataValidation.clear();
                     if (type !== "none") {
                         if (message.length > 255) message = message.substring(0, 250) + "...";
                         colStrip.dataValidation.prompt = {
@@ -154,11 +156,6 @@ export const VisualLogic = {
                     }
 
                     // B. Apply In-Cell Counter (Superscript)
-                    let cellValue = "";
-                    if (ptoCount >= 2) {
-                        cellValue = ptoCount;
-                    }
-
                     if (ptoCount >= 2) {
                         // 2+ People: Write the Number
                         const columnValues = new Array(rowCount).fill([ptoCount]);
@@ -174,8 +171,8 @@ export const VisualLogic = {
                     }
                 }
 
-                // Sync every 50 columns
-                if (c % 50 === 0) await context.sync();
+                // Reduced sync frequency: only every 100 columns for speed
+                if (c % 100 === 0) await context.sync();
             }
 
             await context.sync();

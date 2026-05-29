@@ -8,7 +8,7 @@ import { VisualLogic } from '../utils/visualLogic';
 import { FormattingLogic } from '../utils/formattingLogic_v2';
 import { faCircleUser } from '@fortawesome/free-regular-svg-icons';
 
-const MainNavbar = ({ activeTab, setActiveTab, isFileValid, unseenCount }) => {
+const MainNavbar = ({ activeTab, setActiveTab, isFileValid, unseenCount, fileType, onAddTimecard }) => {
     const [expanded, setExpanded] = useState(false);
     const [isSyncing, setIsSyncing] = useState(false);
 
@@ -123,31 +123,42 @@ const MainNavbar = ({ activeTab, setActiveTab, isFileValid, unseenCount }) => {
                 <Nav className="me-auto">
                     {isFileValid ? (
                         <>
-                            <Nav.Link eventKey="ProjectList">Active Projects</Nav.Link>
-                            <Nav.Link eventKey="AddProject">Add a New Project</Nav.Link>
-                            
-                            <NavDropdown 
-                                title="Options" 
-                                id="basic-nav-dropdown" 
-                                onToggle={() => triggerResizeLoop()}
-                            >
-                                {/* ACTION 1: GRID ALERTS */}
-                                <NavDropdown.Item onClick={handleRefreshVisuals} disabled={isSyncing} aria-label="Refresh Grid Alerts">
-                                    <FontAwesomeIcon icon={faBell} className="me-2 text-muted" /> 
-                                    {isSyncing ? "Syncing..." : "Refresh Grid Alerts"}
-                                </NavDropdown.Item>
+                            {fileType === 'gantt' && (
+                                <>
+                                    <Nav.Link eventKey="ProjectList">Active Projects</Nav.Link>
+                                    <Nav.Link eventKey="AddProject">Add a New Project</Nav.Link>
+                                    
+                                    <NavDropdown 
+                                        title="Options" 
+                                        id="basic-nav-dropdown" 
+                                        onToggle={() => triggerResizeLoop()}
+                                    >
+                                        {/* ACTION 1: GRID ALERTS */}
+                                        <NavDropdown.Item onClick={handleRefreshVisuals} disabled={isSyncing} aria-label="Refresh Grid Alerts">
+                                            <FontAwesomeIcon icon={faBell} className="me-2 text-muted" /> 
+                                            {isSyncing ? "Syncing..." : "Refresh Grid Alerts"}
+                                        </NavDropdown.Item>
 
-                                {/* ACTION 2: FORMATTING */}
-                                <NavDropdown.Item onClick={handleResetFormatting} disabled={isSyncing} aria-label="Reset Formatting Rules">
-                                    <FontAwesomeIcon icon={faPaintRoller} className="me-2 text-muted" /> 
-                                    Reset Formatting Rules
-                                </NavDropdown.Item>
-                                
-                                <NavDropdown.Divider />
-                                
-                                <NavDropdown.Item href="#action/3.1"><FontAwesomeIcon icon={faFileExport} className="me-2 text-muted" /> Export CSV</NavDropdown.Item>
-                                <NavDropdown.Item href="#action/3.2"><FontAwesomeIcon icon={faPrint} className="me-2 text-muted" /> Print View</NavDropdown.Item>
-                            </NavDropdown>
+                                        {/* ACTION 2: FORMATTING */}
+                                        <NavDropdown.Item onClick={handleResetFormatting} disabled={isSyncing} aria-label="Reset Formatting Rules">
+                                            <FontAwesomeIcon icon={faPaintRoller} className="me-2 text-muted" /> 
+                                            Reset Formatting Rules
+                                        </NavDropdown.Item>
+                                        
+                                        <NavDropdown.Divider />
+                                        
+                                        <NavDropdown.Item href="#action/3.1"><FontAwesomeIcon icon={faFileExport} className="me-2 text-muted" /> Export CSV</NavDropdown.Item>
+                                        <NavDropdown.Item href="#action/3.2"><FontAwesomeIcon icon={faPrint} className="me-2 text-muted" /> Print View</NavDropdown.Item>
+                                    </NavDropdown>
+                                </>
+                            )}
+
+                            {fileType === 'timecard' && (
+                                <>
+                                    <Nav.Link eventKey="TimecardDashboard">Timecard Dashboard</Nav.Link>
+                                    <Nav.Link onClick={() => onAddTimecard()}>Add Timesheet</Nav.Link>
+                                </>
+                            )}
                         </>
                     ) : (
                         <Nav.Item className="text-danger small pt-2 fw-bold">
