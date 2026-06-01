@@ -9,6 +9,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { faCalendarCheck } from '@fortawesome/free-regular-svg-icons';
 import TimecardDetail from './TimecardDetail';
+import { TimecardLogic } from '../utils/timecardLogic';
 
 const TimecardView = ({ currentFileName, refreshTrigger }) => {
     const [timesheets, setTimesheets] = useState([]);
@@ -62,9 +63,12 @@ const TimecardView = ({ currentFileName, refreshTrigger }) => {
                 await context.sync();
 
                 const results = sheetsToLoad.map(item => {
-                    // Detect Green Variants: Standard (#00B050), Theme (#70AD47), Light (#92D050), etc.
+                    // Detect Green Variants (Processed) vs Orange (Pending Submission)
                     const hex = item.tabColor ? item.tabColor.toUpperCase() : "";
-                    const isSubmitted = ["#00B050", "#70AD47", "#008000", "#92D050", "#C6EFCE"].includes(hex);
+                    const isProcessed = ["#00B050", "#70AD47", "#008000", "#92D050", "#C6EFCE"].includes(hex);
+                    const isPending = ["#FFC000", "#FFFF00", "#FFD700", "#FFA500"].includes(hex);
+                    
+                    const isLocked = isProcessed || isPending;
                     
                     const now = new Date();
                     const todaySerial = Math.floor(now.getTime() / (24 * 60 * 60 * 1000) + 25569);
@@ -89,18 +93,19 @@ const TimecardView = ({ currentFileName, refreshTrigger }) => {
                             const mDate = new Date(Math.round((endVal + 3 - 25569) * 86400 * 1000));
                             const localM = new Date(mDate.getTime() + (mDate.getTimezoneOffset() * 60000));
                             mondayDateStr = `${localM.getMonth() + 1}/${localM.getDate()}/${localM.getFullYear()}`;
-                        } else if (!isSubmitted && todaySerial === endVal + 3) {
+                        } else if (!isLocked && todaySerial === endVal + 3) {
                             // Today is the Monday following the end of the timesheet
                             const currentHour = now.getHours();
                             dueStatus = currentHour < 12 ? 'monday_due' : 'monday_past_due';
                         }
                     }
 
-                    // VALIDATION LOGIC
                     let hasError = false;
                     // 1. Checksums
-                    if (item.k17.values[0][0] !== 0 || item.k29.values[0][0] !== 0 || 
-                        item.k34.values[0][0] !== 0 || item.h38.values[0][0] !== 0) {
+                    if (TimecardLogic.isErrorValue(item.k17.values[0][0]) || 
+                        TimecardLogic.isErrorValue(item.k29.values[0][0]) || 
+                        TimecardLogic.isErrorValue(item.k34.values[0][0]) || 
+                        TimecardLogic.isErrorValue(item.h38.values[0][0])) {
                         hasError = true;
                     }
 
@@ -115,7 +120,7 @@ const TimecardView = ({ currentFileName, refreshTrigger }) => {
 
                             if (total < 0) hasError = true;
                             // Allocation Mismatch
-                            if (total > 0 && Math.abs((off + trav + pto) - total) > 0.01) hasError = true;
+                            if (total > 0 && TimecardLogic.isErrorValue((off + trav + pto) - total)) hasError = true;
                             // Missing PTO Type
                             if (pto > 0 && (!ptoType || ptoType === "")) hasError = true;
                         }
@@ -125,7 +130,9 @@ const TimecardView = ({ currentFileName, refreshTrigger }) => {
                         name: item.name,
                         start: item.startRange.text[0][0] || "TBD",
                         end: item.endRange.text[0][0] || "TBD",
-                        isSubmitted: isSubmitted,
+                        isSubmitted: isLocked,
+                        isProcessed: isProcessed,
+                        isPending: isPending,
                         isCurrent: isCurrent,
                         dueStatus: dueStatus,
                         mondayDateStr: mondayDateStr,
@@ -218,7 +225,8 @@ const TimecardView = ({ currentFileName, refreshTrigger }) => {
                                                 )}
                                             </div>
                                             {/* <small className="text-muted">{ts.name}</small> */}
-                                            {ts.isSubmitted && <Badge bg="success" className="ms-2" style={{fontSize: '0.6rem'}} title="This timesheet is submitted and locked. Contact HR or your Manager to un-submit.">SUBMITTED</Badge>}
+                                            {ts.isProcessed && <Badge bg="success" className="ms-2" style={{fontSize: '0.6rem'}}>SUBMITTED & PROCESSED</Badge>}
+                                            {ts.isPending && <Badge bg="warning" text="dark" className="ms-2" style={{fontSize: '0.6rem'}}>PENDING PROCESSING</Badge>}
                                             {ts.hasError && <Badge bg="danger" className="ms-2" style={{fontSize: '0.6rem'}}><FontAwesomeIcon icon={faExclamationCircle} className="me-1" /> ERRORS</Badge>}
                                         </div>
                                     </div>

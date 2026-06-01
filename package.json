@@ -1,6 +1,6 @@
 {
   "name": "gnatthelper",
-  "version": "5.13.0",
+  "version": "5.13.1",
   "description": "Helper functions for Barbizon Gnatt in Excel",
   "type": "module",
   "homepage": "https://jasonrmace.github.io/gnattHelper/",
@@ -27,6 +27,7 @@
     "@fortawesome/free-solid-svg-icons": "^7.2.0",
     "@fortawesome/react-fontawesome": "^3.3.1",
     "bootstrap": "^5.3.8",
+    "pdf-lib": "^1.17.1",
     "react": "^19.2.6",
     "react-bootstrap": "^2.10.10",
     "react-datepicker": "^9.1.0",

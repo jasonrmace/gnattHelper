@@ -5,10 +5,11 @@ import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faArrowLeft, faSave, faClock, faBriefcase, faPlane, faUmbrellaBeach, faCalculator, faExclamationTriangle } from '@fortawesome/free-solid-svg-icons';
+import { TimecardLogic } from '../utils/timecardLogic';
 
 const TimecardDetail = ({ period, onBack }) => {
     const [loading, setLoading] = useState(true);
-    const [saving, setSaving] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const [showSubmitModal, setShowSubmitModal] = useState(false);
     const [week1, setWeek1] = useState([]);
     const [week2, setWeek2] = useState([]);
@@ -206,19 +207,36 @@ const TimecardDetail = ({ period, onBack }) => {
         };
     };
 
-    // --- VALIDATION HELPER ---
     const checkWeekErrors = (days) => {
         return days.some(d => {
             const total = parseFloat(d.total) || 0;
             const allocSum = (parseFloat(d.office) || 0) + (parseFloat(d.travel) || 0) + (parseFloat(d.pto) || 0);
-            const hasMismatch = total > 0 && Math.abs(allocSum - total) > 0.01;
+            const hasMismatch = total > 0 && TimecardLogic.isErrorValue(allocSum - total);
             const ptoHours = parseFloat(d.pto) || 0;
             const ptoError = ptoHours > 0 && !d.ptoType;
             return total < 0 || hasMismatch || ptoError;
         });
     };
 
-    const errorsExist = summary.w1Check !== 0 || summary.w2Check !== 0 || summary.grandCheck !== 0 || summary.finalCheck !== 0 || checkWeekErrors(week1) || checkWeekErrors(week2);
+    const handleConfirmSubmission = async () => {
+        setIsSubmitting(true);
+        setShowSubmitModal(false);
+        try {
+            const success = await TimecardLogic.submitTimesheet(period.name);
+            if (success) onBack();
+        } catch (error) {
+            console.error("Submission failed:", error);
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    const errorsExist = TimecardLogic.isErrorValue(summary.w1Check) || 
+                        TimecardLogic.isErrorValue(summary.w2Check) || 
+                        TimecardLogic.isErrorValue(summary.grandCheck) || 
+                        TimecardLogic.isErrorValue(summary.finalCheck) || 
+                        checkWeekErrors(week1) || 
+                        checkWeekErrors(week2);
 
     const renderWeekTable = (days, startRowIndex) => (
         <div className="table-responsive">
@@ -429,15 +447,15 @@ const TimecardDetail = ({ period, onBack }) => {
             ) : (
                 <>
                     {/* Checksum Errors */}
-                    {(summary.w1Check !== 0 || summary.w2Check !== 0 || summary.grandCheck !== 0 || summary.finalCheck !== 0) && (
+                    {(TimecardLogic.isErrorValue(summary.w1Check) || TimecardLogic.isErrorValue(summary.w2Check) || TimecardLogic.isErrorValue(summary.grandCheck) || TimecardLogic.isErrorValue(summary.finalCheck)) && (
                         <div className="p-3 border-top">
                             <Alert variant="danger" className="mb-0 py-2 small d-flex align-items-center">
                                 <FontAwesomeIcon icon={faExclamationTriangle} className="me-2" />
                                 <div>
                                     <div className="fw-bold">Pay Period Errors Detected</div>
-                                    {summary.w1Check !== 0 && <div>Week 1 Allocation Mismatch: {summary.w1Check}</div>}
-                                    {summary.w2Check !== 0 && <div>Week 2 Allocation Mismatch: {summary.w2Check}</div>}
-                                    {summary.finalCheck !== 0 && <div>Grand Total Detail Mismatch: {summary.finalCheck}</div>}
+                                    {TimecardLogic.isErrorValue(summary.w1Check) && <div>Week 1 Allocation Mismatch: {summary.w1Check}</div>}
+                                    {TimecardLogic.isErrorValue(summary.w2Check) && <div>Week 2 Allocation Mismatch: {summary.w2Check}</div>}
+                                    {TimecardLogic.isErrorValue(summary.finalCheck) && <div>Grand Total Detail Mismatch: {summary.finalCheck}</div>}
                                 </div>
                             </Alert>
                         </div>
@@ -551,8 +569,8 @@ const TimecardDetail = ({ period, onBack }) => {
                 </Modal.Body>
                 <Modal.Footer className="bg-light py-2">
                     <Button variant="secondary" size="sm" onClick={() => setShowSubmitModal(false)}>Cancel</Button>
-                    <Button variant="primary" size="sm" disabled={errorsExist} onClick={() => setShowSubmitModal(false)}>
-                        Confirm Submission
+                    <Button variant="primary" size="sm" disabled={errorsExist || isSubmitting} onClick={handleConfirmSubmission}>
+                        {isSubmitting ? <><Spinner animation="border" size="sm" className="me-2" />Submitting...</> : "Confirm Submission"}
                     </Button>
                 </Modal.Footer>
             </Modal>

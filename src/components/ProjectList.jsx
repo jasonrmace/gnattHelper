@@ -64,13 +64,24 @@ const ProjectList = ({ refreshTrigger, highlightId }) => {
         setIsFetching(true);
         try {
             await Excel.run(async (context) => {
-                const teamSheet = context.workbook.worksheets.getItem("Team");
+                const teamSheet = context.workbook.worksheets.getItemOrNullObject("Team");
+                const sheet = context.workbook.worksheets.getItemOrNullObject("GanttChart");
+                
+                teamSheet.load("isNullObject");
+                sheet.load("isNullObject");
+                await context.sync();
+
+                // Handle cases where sheets are missing (e.g. initial load in a Timecard file)
+                if (teamSheet.isNullObject || sheet.isNullObject) {
+                    setProjects([]);
+                    return;
+                }
+
                 const teamRange = teamSheet.getUsedRange();
                 teamRange.load("text");
 
-                const sheet = context.workbook.worksheets.getItem("GanttChart");
                 const footerRange = sheet.getRange("A:A").find("DO NOT DELETE", { completeMatch: false, matchCase: false });
-                footerRange.load("rowIndex");
+                footerRange.load(["rowIndex", "isNullObject"]);
                 await context.sync();
 
                 const teamMap = {};
@@ -82,6 +93,11 @@ const ProjectList = ({ refreshTrigger, highlightId }) => {
                 }
 
                 const dataStartIndex = 7; 
+                if (footerRange.isNullObject) {
+                    setProjects([]);
+                    return;
+                }
+
                 const footerIndex = footerRange.rowIndex;
                 const rowCount = footerIndex - dataStartIndex;
 

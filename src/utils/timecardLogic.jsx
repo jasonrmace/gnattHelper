@@ -1,9 +1,171 @@
-/* global Excel */
+/* global Excel, Office */
 import React from 'react';
 import { Button } from 'react-bootstrap';
+import { PDFDocument, PDFName } from 'pdf-lib';
 
 export const TimecardLogic = {
     isProcessing: false,
+
+    /**
+     * Handles floating point precision issues (e.g. 7.1e-15) by using a tolerance
+     */
+    isErrorValue: (val) => Math.abs(parseFloat(val) || 0) > 0.01,
+
+    /**
+     * Manually constructs a digital signature field in the PDF structure.
+     * This is used when the high-level library API is unavailable or 
+     * fails to register the field correctly for viewers like Bluebeam.
+     */
+    createManualSignatureField: (pdfDoc, page, name, x, y, width, height) => {
+        const { context } = pdfDoc;
+
+        // 1. Create the Signature Widget Annotation (doubles as the field)
+        const widgetDict = context.obj({
+            Type: 'Annot',
+            Subtype: 'Widget',
+            FT: 'Sig',
+            Rect: [x, y, x + width, y + height],
+            T: context.objString(name),
+            F: 4,      // Printable
+            P: page.ref,
+        });
+        const widgetRef = context.register(widgetDict);
+
+        // 2. Add annotation to the page
+        let annots = context.lookup(page.node.get(PDFName.of('Annots')));
+        if (!annots) {
+            annots = context.obj([]);
+            page.node.set(PDFName.of('Annots'), annots);
+        }
+        annots.push(widgetRef);
+
+        // 3. Register field in document AcroForm
+        const catalog = context.lookup(context.trailer.get(PDFName.of('Root')));
+        let acroForm = context.lookup(catalog.get(PDFName.of('AcroForm')));
+        if (!acroForm) {
+            acroForm = context.obj({ Fields: [] });
+            catalog.set(PDFName.of('AcroForm'), acroForm);
+        }
+        const fields = context.lookup(acroForm.get(PDFName.of('Fields'))) || context.obj([]);
+        if (!acroForm.get(PDFName.of('Fields'))) {
+            acroForm.set(PDFName.of('Fields'), fields);
+        }
+        fields.push(widgetRef);
+        acroForm.set(PDFName.of('NeedAppearances'), context.boolean(true));
+    },
+
+    /**
+     * Handles the submission process: 
+     * 1. Changes tab color to Orange/Pending
+     * 2. Generates PDF of current sheet
+     * 3. Injects signature field via pdf-lib
+     * 4. Triggers download/view
+     */
+    submitTimesheet: async (periodName) => {
+        return await Excel.run(async (context) => {
+            const workbook = context.workbook;
+            const sheets = workbook.worksheets;
+            const currentSheet = sheets.getItem(periodName);
+
+            // 1. Set Tab Color to Orange (#FFC000)
+            currentSheet.tabColor = "#FFC000";
+            
+            // 2. Prepare for PDF: Hide others to ensure single sheet export
+            sheets.load("items");
+            await context.sync();
+            const visibilityStates = sheets.items.map(s => ({ name: s.name, visibility: s.visibility }));
+            
+            sheets.items.forEach(s => {
+                if (s.name !== periodName) s.visibility = Excel.SheetVisibility.hidden;
+            });
+            await context.sync();
+
+            // 3. Get PDF Bytes from Office JS
+            const pdfBytes = await new Promise((resolve, reject) => {
+                Office.context.document.getFileAsync(Office.FileType.Pdf, { sliceSize: 65536 }, (result) => {
+                    if (result.status === Office.AsyncResultStatus.Succeeded) {
+                        const file = result.value;
+                        const slices = [];
+                        let gotSlices = 0;
+                        const getSlice = (index) => {
+                            file.getSliceAsync(index, (sliceResult) => {
+                                if (sliceResult.status === Office.AsyncResultStatus.Succeeded) {
+                                    slices[index] = sliceResult.value.data;
+                                    gotSlices++;
+                                    if (gotSlices === file.sliceCount) {
+                                        file.closeAsync();
+                                        const totalLength = slices.reduce((acc, s) => acc + s.length, 0);
+                                        const combined = new Uint8Array(totalLength);
+                                        let offset = 0;
+                                        for (const slice of slices) { combined.set(slice, offset); offset += slice.length; }
+                                        resolve(combined);
+                                    } else { getSlice(gotSlices); }
+                                } else { file.closeAsync(); reject(sliceResult.error); }
+                            });
+                        };
+                        getSlice(0);
+                    } else { reject(result.error); }
+                });
+            });
+
+            // const signatureWidget = pdfDoc.context.obj({
+            //     Type: 'Annot',
+            //     Subtype: 'Widget',
+            //     FT: 'Sig',
+            //     Rect: [50, 50, 200, 100],
+            //     T: pdfDoc.context.objString('employee_signature'),
+            //     F: 4,
+            //     P: page.ref,
+            // })
+
+            // 4. Restore original visibility
+            sheets.items.forEach(s => {
+                const original = visibilityStates.find(v => v.name === s.name);
+                if (original) s.visibility = original.visibility;
+            });
+            await context.sync();
+
+                        // 5. Add Form Signature Field (pdf-lib)
+            let finalPdfBytes = pdfBytes;
+            try {
+                const pdfDoc = await PDFDocument.load(pdfBytes);
+                const pages = pdfDoc.getPages();
+                const firstPage = pages[0];
+                const { height } = firstPage.getSize();
+
+                const x = 2.9 * 72;              // 2.9 inches from left
+                const yFromTop = 7.5 * 72;       // 7.5 inches from top
+                const width = 3 * 72;            // 3 inches wide
+                const heightBox = 36;            // 0.5 inch high
+                const y = height - yFromTop - heightBox;
+
+                // Call the manual builder
+                TimecardLogic.createManualSignatureField(pdfDoc, firstPage, 'employee_signature', x, y, width, heightBox);
+
+                finalPdfBytes = await pdfDoc.save();
+            } catch (pdfErr) {
+
+                console.warn("pdf-lib processing failed, providing raw PDF:", pdfErr);
+            }
+
+            // 6. Provide Download & Open View
+            const blob = new Blob([finalPdfBytes], { type: 'application/pdf' });
+            const url = URL.createObjectURL(blob);
+            
+            // Trigger browser download
+            // This is the reliable way to "save" the file. 
+            // Most browsers will save to 'Downloads' or prompt if configured.
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${periodName}_Timesheet.pdf`;
+            a.click();
+
+            if (window.GlobalToast) window.GlobalToast.success("Timesheet Submitted! PDF generated.");
+            if (window.GlobalRefresh) window.GlobalRefresh();
+            
+            return true;
+        });
+    },
 
     /**
      * Automatically checks if a new pay period sheet needs to be generated.
