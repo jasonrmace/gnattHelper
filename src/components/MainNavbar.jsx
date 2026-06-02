@@ -159,6 +159,12 @@ const MainNavbar = ({ activeTab, setActiveTab, isFileValid, unseenCount, fileTyp
                                     <Nav.Link onClick={() => onAddTimecard()}>Add Timesheet</Nav.Link>
                                 </>
                             )}
+
+                            {fileType === 'pm_timelog' && (
+                                <>
+                                    <Nav.Link eventKey="PmTimelogDashboard">Timelog Dashboard</Nav.Link>
+                                </>
+                            )}
                         </>
                     ) : (
                         <Nav.Item className="text-danger small pt-2 fw-bold">

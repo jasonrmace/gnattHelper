@@ -23,6 +23,7 @@ import CreateTimecardModal from './components/CreateTimecardModal';
 // 1. CONFIGURATION
 const GANTT_FILENAMES = ["Houston Summer 2026 [Macros].xlsm", "Houston Summer 2026.xlsx"];
 const TIMECARD_PREFIX = "2026_Timecard_Template_";
+const PM_TIMELOG_PREFIX = "PM_TIMELOG_";
 
 // --- GLOBAL LOADING OVERLAY ---
 const LoadingOverlay = ({ isVisible, message }) => {
@@ -45,7 +46,7 @@ const LoadingOverlay = ({ isVisible, message }) => {
 
 function App() {
     // --- STATE ---
-    const [version] = useState("v5.13.1"); 
+    const [version] = useState("v5.13.2"); 
     const [activeTab, setActiveTab] = useState("ProjectList");
     const [isValidFile, setIsValidFile] = useState(false);
     const [currentName, setCurrentName] = useState("");
@@ -147,12 +148,14 @@ function App() {
                 }
 
                 const decodedUrl = decodeURI(url);
-                const fileName = decodedUrl.substring(decodedUrl.lastIndexOf('/') + 1);
+                // Split by either forward slash / or backslash \ and get the last part
+                const fileName = decodedUrl.split(/[\\\/]/).pop();
                 setCurrentName(fileName);
 
                 const isGantt = GANTT_FILENAMES.includes(fileName);
                 const isTimecard = fileName.startsWith(TIMECARD_PREFIX);
-                const isAllowed = isGantt || isTimecard;
+                const isPmTimelog = fileName.startsWith(PM_TIMELOG_PREFIX);
+                const isAllowed = isGantt || isTimecard || isPmTimelog;
 
                 setIsValidFile(isAllowed);
 
@@ -275,6 +278,9 @@ function App() {
                             }
                         });
                     }
+                } else if (isPmTimelog) {
+                    setFileType('pm_timelog');
+                    setActiveTab("PmTimelogDashboard");
                 }
 
                 // C. CHECK IDENTITY
@@ -421,6 +427,12 @@ function App() {
                         {activeTab === "ProjectList" && <ProjectList refreshTrigger={refreshTrigger} highlightId={highlightId} />}
                         {activeTab === "AddProject" && <CreateProject onProjectCreated={handleProjectCreated} />}
                         {activeTab === "TimecardDashboard" && <TimecardView currentFileName={currentName} refreshTrigger={refreshTrigger} />}
+                        {activeTab === "PmTimelogDashboard" && (
+                            <div className="text-center mt-5">
+                                <h4 className="fw-bold text-primary">Project Management Timelog Functions</h4>
+                                <p className="text-muted">Coming soon...</p>
+                            </div>
+                        )}
                         {activeTab === "Settings" && <SettingsPage currentFileName={currentName} />} 
                         {activeTab === "Updates" && <UpdatesPage onMarkedSeen={() => setUnseenCount(0)} />}
                     </>
