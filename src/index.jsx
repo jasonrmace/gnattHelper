@@ -4,7 +4,7 @@ import ReactDOM from 'react-dom/client';
 import { Container, Alert, Spinner } from 'react-bootstrap';
 import toast, { Toaster } from 'react-hot-toast';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSpinner, faBell, faTimes, faCrosshairs, faUserCircle, faCalendarDays } from '@fortawesome/free-solid-svg-icons';
+import { faBell, faTimes, faCrosshairs, faUserCircle, faCalendarDays } from '@fortawesome/free-solid-svg-icons';
 
 import { IdentityLogic } from './utils/identityLogic';
 import { EventListeners } from './utils/eventListeners';
@@ -24,6 +24,7 @@ import IdentityModal from './components/IdentityModal';
 import UpdatesPage from './components/UpdatesPage';
 import TimecardView from './components/TimecardView';
 import CreateTimecardModal from './components/CreateTimecardModal';
+import BarbizonSpinner from './components/BarbizonSpinner';
 
 // 1. CONFIGURATION
 const GANTT_FILENAMES = ["Barbizon Texas Project Management.xlsx"];
@@ -40,20 +41,22 @@ const LoadingOverlay = ({ isVisible, message }) => {
         <div style={{
             position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', // Ensure full screen coverage
             backgroundColor: 'rgba(255, 255, 255, 0.9)', zIndex: 9999,
+            background: '#090d16',
+            // backgorundColor: '#090d16 !important', zIndex: 9999,
             display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center'
         }}>
-            <div className="text-primary mb-3" aria-label="Loading">
-                <FontAwesomeIcon icon={faSpinner} spin size="3x" />
+            <div className="mb-4" aria-label="Loading" style={{
+                backgroundColor: 'rgba(9, 13, 22, 0.9)',
+            }}>
+                <BarbizonSpinner size={100} speed="1.2s" message={<div className="text-center">{message} <p className="small" style={{color: '#FFFFFF'}}>Please wait while Excel updates...</p></div>} />
             </div>
-            <h5 className="text-dark fw-bold">{message}</h5>
-            <p className="text-muted small">Please wait while Excel updates...</p>
         </div>
     );
 };
 
 function App() {
     // --- STATE ---
-    const [version] = useState("v6.0.0"); 
+    const [version] = useState("v6.1.0"); 
     const [activeTab, setActiveTab] = useState("Home");
     const [isValidFile, setIsValidFile] = useState(false);
     const [currentName, setCurrentName] = useState("");
@@ -201,10 +204,12 @@ function App() {
                                         <FontAwesomeIcon icon={faCalendarDays} className="text-warning mt-1" />
                                         <div className="ms-3">
                                             <p className="text-sm font-bold text-dark mb-1" style={{ fontSize: '0.9rem' }}>
-                                                PTO Request: {log.author}
+                                                PTO Request: {log.author.toLowerCase().replace(/\b\w/g, s => s.toUpperCase())}
                                             </p>
                                             <p className="text-sm text-muted mb-0" style={{ fontSize: '0.85rem' }}>
-                                                {log.change}
+                                                {log.change.replace(/Added PTO for ([^:]+)/, (match, name) => 
+                                                    `Added PTO for ${name.toLowerCase().replace(/\b\w/g, s => s.toUpperCase())}`
+                                                )}
                                             </p>
                                         </div>
                                     </div>

@@ -36,6 +36,11 @@ const MainNavbar = ({ activeTab, setActiveTab, isFileValid, unseenCount, fileTyp
     // --- 1. TRIGGER GRID ALERTS (VisualLogic) ---
     const handleRefreshVisuals = async () => {
         if (isSyncing) return;
+        handleLayoutChange(false); // Collapse menu immediately
+        
+        // Small delay to allow the menu animation to start before heavy logic
+        await new Promise(resolve => setTimeout(resolve, 150));
+
         setIsSyncing(true);
         try {
             await Excel.run(async (context) => {
@@ -48,13 +53,17 @@ const MainNavbar = ({ activeTab, setActiveTab, isFileValid, unseenCount, fileTyp
             console.error(e);
         } finally {
             setIsSyncing(false);
-            setExpanded(false);
         }
     };
 
     // --- 2. TRIGGER FORMATTING RESET (FormattingLogic) ---
     const handleResetFormatting = async () => {
         if (isSyncing) return;
+        handleLayoutChange(false); // Collapse menu immediately
+
+        // Small delay to allow the menu animation to start before heavy logic
+        await new Promise(resolve => setTimeout(resolve, 150));
+
         setIsSyncing(true);
         try {
             await Excel.run(async (context) => {
@@ -67,13 +76,14 @@ const MainNavbar = ({ activeTab, setActiveTab, isFileValid, unseenCount, fileTyp
             console.error(e);
         } finally {
             setIsSyncing(false);
-            setExpanded(false);
         }
     };
 
     // --- 3. TOGGLE CHANGELOG VISIBILITY (Developer Only) ---
     const handleToggleChangelog = async () => {
         if (isSyncing) return;
+        handleLayoutChange(false);
+
         setIsSyncing(true);
         try {
             await Excel.run(async (context) => {
@@ -103,13 +113,14 @@ const MainNavbar = ({ activeTab, setActiveTab, isFileValid, unseenCount, fileTyp
             console.error(e);
         } finally {
             setIsSyncing(false);
-            setExpanded(false);
         }
     };
 
     // --- 4. TOGGLE VACATIONS VISIBILITY (Developer Only) ---
     const handleToggleVacations = async () => {
         if (isSyncing) return;
+        handleLayoutChange(false);
+
         setIsSyncing(true);
         try {
             await Excel.run(async (context) => {
@@ -139,13 +150,14 @@ const MainNavbar = ({ activeTab, setActiveTab, isFileValid, unseenCount, fileTyp
             console.error(e);
         } finally {
             setIsSyncing(false);
-            setExpanded(false);
         }
     };
 
     // --- 5. TOGGLE TEAM VISIBILITY (Developer Only) ---
     const handleToggleTeam = async () => {
         if (isSyncing) return;
+        handleLayoutChange(false);
+
         setIsSyncing(true);
         try {
             await Excel.run(async (context) => {
@@ -175,12 +187,13 @@ const MainNavbar = ({ activeTab, setActiveTab, isFileValid, unseenCount, fileTyp
             console.error(e);
         } finally {
             setIsSyncing(false);
-            setExpanded(false);
         }
     };
 
     const handleLogVersion = async () => {
         if (!versionInput) return;
+        handleLayoutChange(false);
+
         setIsSyncing(true);
         try {
             await Excel.run(async (context) => {
@@ -194,7 +207,6 @@ const MainNavbar = ({ activeTab, setActiveTab, isFileValid, unseenCount, fileTyp
             console.error(e);
         } finally {
             setIsSyncing(false);
-            setExpanded(false);
         }
     };
 

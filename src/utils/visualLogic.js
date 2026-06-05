@@ -137,12 +137,18 @@ export const VisualLogic = {
                         for (let i = 0; i < ptoData.names.length; i++) {
                             const start = ptoData.starts[i];
                             const duration = ptoData.days[i];
-                            const name = ptoData.names[i]?.toString().toUpperCase().trim();
+                            const rawName = ptoData.names[i]?.toString().trim() || "";
+                            const searchName = rawName.toUpperCase();
                             
-                            if (typeof start === 'number' && typeof duration === 'number' && officeMap[name] === sheetName) {
+                            if (typeof start === 'number' && typeof duration === 'number' && officeMap[searchName] === sheetName) {
                                 const end = start + duration - 1;
                                 if (serialDate >= start && serialDate <= end) {
-                                    ptoNames.push(name);
+                                    // Convert to Title Case for display (e.g., "ROB KREPS" -> "Rob Kreps")
+                                    const titleCaseName = rawName.toLowerCase().split(' ').map(word => 
+                                        word.charAt(0).toUpperCase() + word.slice(1)
+                                    ).join(' ');
+                                    
+                                    ptoNames.push(titleCaseName);
                                 }
                             }
                         }
