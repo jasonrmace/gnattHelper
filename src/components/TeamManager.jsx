@@ -96,7 +96,7 @@ const TeamManager = ({ refreshTrigger }) => {
                 if (activeMember) {
                     row = table.rows.getItemAt(activeMember.index);
                 } else {
-                    row = table.rows.add(null, [new Array(columns.items.length).fill("")]).getItemAt(0);
+                    row = table.rows.add(null, [new Array(columns.items.length).fill("")]);
                 }
 
                 // Set values
