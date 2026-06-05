@@ -222,15 +222,11 @@ const ProjectTasks = ({ project, onBack }) => {
                         const diff = Math.ceil(Math.abs(e - s) / (1000 * 60 * 60 * 24)) + 1;
                         sheet.getCell(insertRowIndex, 6).values = [[diff]];
                     }
+                    
+                    // Only run full formatting on structural ADD, not EDIT
+                    await FormattingLogic.generateSmartRules(context);
                     newRow.select();
                 }
-
-                // TARGETED SYNC
-                const targetIndex = formMode === "edit" ? activeTask.rowIndex : insertRowIndex;
-                const rowGridRange = sheet.getRangeByIndexes(targetIndex, 10, 1, 365);
-                const rowNameRange = sheet.getRangeByIndexes(targetIndex, 2, 1, 1);
-                await FormattingLogic.applyRulesToRange(context, rowGridRange, rowNameRange);
-                await VisualLogic.refreshRange(context, targetIndex, 1);
 
                 // --- TRIGGER LOGIC ENGINE ---
                 await GanttLogic.updateProjectAverages(context);

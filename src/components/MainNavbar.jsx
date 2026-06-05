@@ -65,7 +65,7 @@ const MainNavbar = ({ activeTab, setActiveTab, isFileValid, unseenCount, fileTyp
             expand="lg" 
             bg="dark" 
             className="p-3 navbar-dark flex-shrink-0"
-            activeKey={activeTab} 
+            activekey={activeTab} 
             expanded={expanded} 
             onToggle={() => handleLayoutChange(!expanded)}
             onSelect={(selectedKey) => {

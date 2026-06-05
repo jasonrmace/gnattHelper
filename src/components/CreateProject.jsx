@@ -176,13 +176,8 @@ const CreateProject = ({ onProjectCreated }) => {
 
                 // H. TRIGGER LOGIC ENGINES (Phase 2 Integration)
                 // Ensures internal formulas are correct immediately
+                await FormattingLogic.generateSmartRules(context);
                 await GanttLogic.updateProjectAverages(context);
-
-                // J. TARGETED FORMATTING & VISUALS
-                const newGridRange = sheet.getRangeByIndexes(insertRowIndex, 10, 1, 365);
-                const newNameRange = sheet.getRangeByIndexes(insertRowIndex, 2, 1, 1);
-                await FormattingLogic.applyRulesToRange(context, newGridRange, newNameRange);
-                await VisualLogic.refreshRange(context, insertRowIndex, 1);
 
                 // Record the change
                 await ChangelogLogic.logChange(context, `Created Project: ${formData.name} (ID: ${newId})`);

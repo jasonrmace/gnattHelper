@@ -51,15 +51,10 @@ export const EventListeners = {
 
                 // 4. REGISTER 'VACATIONS' LISTENER (If on a different sheet)
                 if (!vacTable.isNullObject) {
-                    const vacSheet = vacTable.worksheet;
-                    vacSheet.load("id, name");
-                    await context.sync();
-
-                    // Only add if it's actually a different sheet (to avoid double-firing)
-                    if (vacSheet.id !== teamSheet.id) {
-                        vacSheet.onChanged.add(handleMetadataChange);
-                        console.log(`✅ Watching Sheet: ${vacSheet.name}`);
-                    }
+                    // Watch the table specifically, not the whole sheet, 
+                    // to avoid triggering on Gantt task edits.
+                    vacTable.onChanged.add(handleMetadataChange);
+                    console.log(`✅ Watching Vacations Table`);
                 } else {
                     console.log("⚠️ 'Vacations' table not found. Only watching 'Team' sheet.");
                 }
@@ -83,24 +78,10 @@ async function handleGanttChange(event) {
         if (window.RefreshBadge) window.RefreshBadge();
     }
 
-      // EXIT: If this is a standard cell edit (RangeEdited), we ignore it.
-    // We only trigger the heavy logic if a project/task row was inserted or deleted.
-    if (event.changeType !== "RowInserted" && event.changeType !== "RowDeleted") {
-        return;
-    }
-
-    console.log(`Structural change detected (${event.changeType}). Syncing Grid...`);
-
-     // Reuse the debounce logic to handle bulk inserts smoothly
-    if (debounceTimer) clearTimeout(debounceTimer);
-
-     debounceTimer = setTimeout(async () => {
-        await Excel.run(async (context) => {
-            // Re-apply everything because indices have shifted
-            await FormattingLogic.generateSmartRules(context);
-            await VisualLogic.refreshGridAlerts(context);
-        });
-    }, 1000);
+    // Structural changes (Insert/Delete) no longer require a full formatting reset
+    // because rules are applied to a large buffer (Row 8-2000) and Excel 
+    // handles range adjustments natively.
+    return;
 }
 
 // --- HANDLER 2: METADATA CHANGES (Debounced Global Refresh) ---

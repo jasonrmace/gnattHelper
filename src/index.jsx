@@ -46,7 +46,7 @@ const LoadingOverlay = ({ isVisible, message }) => {
 
 function App() {
     // --- STATE ---
-    const [version] = useState("v5.13.2"); 
+    const [version] = useState("v5.13.3"); 
     const [activeTab, setActiveTab] = useState("ProjectList");
     const [isValidFile, setIsValidFile] = useState(false);
     const [currentName, setCurrentName] = useState("");
@@ -456,8 +456,11 @@ function App() {
                 <span className="opacity-50" style={{fontSize: "0.7rem"}}>{version}</span>
             </div>
         </div>
-    );
+        );
+    }
+    
+const container = document.getElementById('root');
+if (!window.reactRoot) {
+    window.reactRoot = ReactDOM.createRoot(container);
 }
-
-const root = ReactDOM.createRoot(document.getElementById('root'));
-root.render(<App />);
+window.reactRoot.render(<App />);

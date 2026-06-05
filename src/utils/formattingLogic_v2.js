@@ -28,29 +28,32 @@ export const FormattingLogic = {
 
             // 1. DEFINE RANGES
             const footerRange = sheet.getRange("A:A").find("DO NOT DELETE", { completeMatch: false, matchCase: false });
-            footerRange.load("rowIndex");
+            footerRange.load(["rowIndex", "isNullObject"]);
             await context.sync();
+
+            if (footerRange.isNullObject) {
+                console.error("Formatting Engine: 'DO NOT DELETE' footer not found. Aborting.");
+                return;
+            }
             
             const startRow = 7; // Row 8
             const endRow = footerRange.rowIndex - 1;
-            const rowCount = endRow - startRow + 1;
+            const actualRowCount = Math.max(endRow - startRow + 1, 1);
             
-            const headerRange = sheet.getRange("K6").getExtendedRange(Excel.KeyboardDirection.right);
+            const headerRange = sheet.getRange("K6:ZZ6"); 
             headerRange.load("columnCount");
             await context.sync();
             
             let colCount = headerRange.columnCount;
-            if (colCount > 2000) colCount = 2000; 
-            if (colCount < 1) colCount = 1;
+            if (colCount > 100) colCount = 100; 
+            if (colCount < 10) colCount = 10;
 
-            console.log(`Target Range: Rows=${rowCount}, Cols=${colCount} (Start: K8)`);
-
-            // Define Ranges
-            const gridRange = sheet.getRangeByIndexes(startRow, 10, rowCount, colCount); // Col K
-            const namesRange = sheet.getRangeByIndexes(startRow, 2, rowCount, 1); // Col C
+            console.log(`Target Range: Rows=${actualRowCount}, Cols=${colCount} (Start: K8)`);
 
             // 2. CLEAR OLD RULES & FORMATS
             console.log("STEP 1: Clearing Rules & Scrubbing Colors...");
+            const gridRange = sheet.getRangeByIndexes(startRow, 10, actualRowCount, colCount);
+            const namesRange = sheet.getRangeByIndexes(startRow, 2, actualRowCount, 1);
             
             // Clear all before full re-apply
             gridRange.conditionalFormats.clearAll();
@@ -58,7 +61,10 @@ export const FormattingLogic = {
             gridRange.format.fill.clear();
             namesRange.format.fill.clear();
 
-            await FormattingLogic.applyRulesToRange(context, gridRange, namesRange);
+            // CRITICAL: Sync after clearing to reset the CF engine state
+            await context.sync();
+
+            await FormattingLogic.applyRulesToRange(context, startRow, actualRowCount, colCount);
         } catch (error) {
             console.error("Formatting Logic Error:", error);
         } finally {
@@ -70,43 +76,61 @@ export const FormattingLogic = {
      * Applies logic to a SPECIFIC range without clearing existing rules elsewhere.
      * Use this for new rows to ensure they inherit the Gantt behavior.
      */
-    applyRulesToRange: async (context, gridRange, namesRange) => {
+    applyRulesToRange: async (context, startRow, rowCount, colCount) => {
         try {
             const sheet = context.workbook.worksheets.getItem("GanttChart");
             const teamSheet = context.workbook.worksheets.getItem("Team");
+            
+            const gridRange = sheet.getRangeByIndexes(startRow, 10, rowCount, colCount);
+            const namesRange = sheet.getRangeByIndexes(startRow, 2, rowCount, 1);
+            const r = startRow + 1;
+
+            if (rowCount <= 0) return;
+
+            // CRITICAL: Unmerge before applying CF rules. 
+            // The Excel JS API often throws 'ItemNotFound' when adding CFs to ranges with partial merges.
+            gridRange.unmerge();
+            namesRange.unmerge();
+
+            gridRange.format.fill.clear();
+            namesRange.format.fill.clear();
 
             // LOAD TEAM COLORS
             console.log("STEP 2: Fetching Colors...");
             let teamRules = [];
-            const teamTable = teamSheet.tables.getItem("Team");
-            const nameCol = teamTable.columns.getItem("First Name").getDataBodyRange();
-            const colorCol = teamTable.columns.getItem("Color").getDataBodyRange();
-            
-            nameCol.load("values");
-            const colorProps = colorCol.getCellProperties({ format: { fill: { color: true } } });
+            const teamTable = teamSheet.tables.getItemOrNullObject("Team");
+            teamTable.load("isNullObject");
             await context.sync();
 
-            const names = nameCol.values;
-            const colors = colorProps.value;
+            if (teamTable.isNullObject) {
+                console.warn("Formatting Engine: 'Team' table not found. Skipping team colors.");
+            } else {
+                const rowCount = teamTable.rows.getCount();
+                await context.sync();
 
-            for (let i = 0; i < names.length; i++) {
-                const rawName = names[i][0];
-                if (colors[i] && colors[i][0]) {
-                    let hex = colors[i][0].format.fill.color;
-                    
-                    let isInvalid = !hex || hex === "null";
-                    if (typeof hex === 'string') {
-                        if (hex.toUpperCase() === "#FFFFFF") isInvalid = true;
-                        if (hex.length !== 7 || hex[0] !== "#") isInvalid = true;
-                    } else {
-                        isInvalid = true;
-                    }
+                if (rowCount.value > 0) {
+                    const nameCol = teamTable.columns.getItem("First Name").getDataBodyRange();
+                    const colorCol = teamTable.columns.getItem("Color").getDataBodyRange();
+                    nameCol.load("values");
+                    const colorProps = colorCol.getCellProperties({ format: { fill: { color: true } } });
+                    await context.sync();
 
-                    if (rawName && !isInvalid) { 
-                        teamRules.push({ 
-                            name: rawName.toString().toUpperCase().trim(), 
-                            color: hex 
-                        });
+                    const names = nameCol.values;
+                    const colors = colorProps.value;
+            
+                    for (let i = 0; i < names.length; i++) {
+                        const rawName = names[i][0];
+                        if (colors[i] && colors[i][0]) {
+                            let hex = colors[i][0].format.fill.color;
+                            let isInvalid = !hex || hex === "null" || (typeof hex === 'string' && (hex.toUpperCase() === "#FFFFFF" || hex.length !== 7));
+                            
+                            if (rawName && !isInvalid) { 
+                                teamRules.push({ 
+                                    name: rawName.toString().toUpperCase().trim(), 
+                                    color: hex 
+                                });
+                            }
+                        }
                     }
                 }
             }
@@ -121,7 +145,7 @@ export const FormattingLogic = {
             console.log("STEP 3a: Applying 100% Green Completion...");
             const fComplete = gridRange.conditionalFormats.add(Excel.ConditionalFormatType.custom);
             // Logic: Inside Date Range AND % Complete (Col H) >= 1 (100%)
-            fComplete.custom.rule.formula = '=AND(K$6>=$E8, K$6<=$F8, ISNUMBER($H8), $H8>=1)';
+            fComplete.custom.rule.formula = `=AND(K$6>=$E${r}, K$6<=$F${r}, ISNUMBER($H${r}), $H${r}>=1)`;
             fComplete.custom.format.fill.color = "#00B050"; // Green
             fComplete.stopIfTrue = false; // Allow borders to draw on top if needed
             await context.sync();
@@ -129,7 +153,7 @@ export const FormattingLogic = {
             // --- BLOCK A: STANDARD PROGRESS BAR (PARTIAL) ---
             console.log("STEP 3b: Applying Standard Progress Bar...");
             const fProg = gridRange.conditionalFormats.add(Excel.ConditionalFormatType.custom);
-            fProg.custom.rule.formula = '=AND(K$6>=$E8, K$6<=$F8, ISNUMBER($H8), ((K$6-$E8)/($F8-$E8+1)) < $H8)';
+            fProg.custom.rule.formula = `=AND(K$6>=$E${r}, K$6<=$F${r}, ISNUMBER($H${r}), ((K$6-$E${r})/($F${r}-$E${r}+1)) < $H${r})`;
             fProg.custom.format.fill.color = "#5a5a5a"; // Dark Grey (User Choice)
             fProg.stopIfTrue = false;
             await context.sync(); 
@@ -154,29 +178,37 @@ export const FormattingLogic = {
 
             // --- BLOCK C: TEAM COLORS (PROJECT PROTECTED) ---
             console.log("STEP 5: Applying Team Colors...");
-            for (let member of teamRules) {
-                const safeName = member.name.replace(/"/g, '""');
-                
-                // 1. NAME CELL (Strict Task Only)
-                // Added: ISNUMBER(SEARCH(".", $A8)) -> Only applies if ID has a dot.
-                const fName = namesRange.conditionalFormats.add(Excel.ConditionalFormatType.custom);
-                fName.custom.rule.formula = `=AND(UPPER(TRIM($C8))="${safeName}", ISNUMBER(SEARCH(".", $A8)))`;
-                fName.custom.format.fill.color = member.color;
-                fName.stopIfTrue = true;
+            if (teamRules.length > 0) { // Only proceed if there are team rules to apply
+                for (let i = 0; i < teamRules.length; i++) {
+                    const member = teamRules[i];
+                    const safeName = member.name.replace(/"/g, '""');
+                    
+                    // 1. NAME CELL (Strict Task Only)
+                    const fName = namesRange.conditionalFormats.add(Excel.ConditionalFormatType.custom);
+                    fName.custom.rule.formula = `=AND(UPPER(TRIM($C${r}))="${safeName}", ISNUMBER(SEARCH(".", $A${r})))`;
+                    fName.custom.format.fill.color = member.color;
+                    fName.stopIfTrue = true;
 
-                // 2. GRID BAR (Strict Task Only)
-                const fBar = gridRange.conditionalFormats.add(Excel.ConditionalFormatType.custom);
-                fBar.custom.rule.formula = `=AND(ISNUMBER($E8), K$6>=$E8, K$6<=$F8, UPPER(TRIM($C8))="${safeName}", ISNUMBER(SEARCH(".", $A8)))`;
-                fBar.custom.format.fill.color = member.color;
-                fBar.stopIfTrue = true; 
+                    // 2. GRID BAR (Strict Task Only)
+                    const fBar = gridRange.conditionalFormats.add(Excel.ConditionalFormatType.custom);
+                    fBar.custom.rule.formula = `=AND(ISNUMBER($E${r}), K$6>=$E${r}, K$6<=$F${r}, UPPER(TRIM($C${r}))="${safeName}", ISNUMBER(SEARCH(".", $A${r})))`;
+                    fBar.custom.format.fill.color = member.color;
+                    fBar.stopIfTrue = true; 
+                    
+                    // Intermediate sync every 3 members to flush the API command batch.
+                    // Prevents ItemNotFound/exhaustion errors on complex range formatting.
+                    if (i % 3 === 0 && i > 0) await context.sync();
+                }
+                await context.sync(); // Final sync after the loop
+            } else {
+                console.log(">> No Team Rules to Apply.");
             }
-            await context.sync(); 
             console.log(">> Team Colors Applied.");
 
             // --- BLOCK D: GENERIC BLUE ---
             console.log("STEP 6: Applying Generic Blue...");
             const fBlue = gridRange.conditionalFormats.add(Excel.ConditionalFormatType.custom);
-            fBlue.custom.rule.formula = '=AND(ISNUMBER($E8), K$6>=$E8, K$6<=$F8)'; 
+            fBlue.custom.rule.formula = `=AND(ISNUMBER($E${r}), K$6>=$E${r}, K$6<=$F${r})`; 
             fBlue.custom.format.fill.color = "#0070C0"; 
             fBlue.stopIfTrue = true; 
             await context.sync();
@@ -185,12 +217,12 @@ export const FormattingLogic = {
             // --- BLOCK E: PARENT ROW ---
             console.log("STEP 7: Applying Parent Rows...");
             const fParent = gridRange.conditionalFormats.add(Excel.ConditionalFormatType.custom);
-            fParent.custom.rule.formula = '=AND($A8<>"", ISERROR(SEARCH(".", $A8)))';
+            fParent.custom.rule.formula = `=AND($A${r}<>"", ISERROR(SEARCH(".", $A${r})))`;
             fParent.custom.format.fill.color = "#D9D9D9"; 
             fParent.stopIfTrue = true; 
             
             const fParentName = namesRange.conditionalFormats.add(Excel.ConditionalFormatType.custom);
-            fParentName.custom.rule.formula = '=AND($A8<>"", ISERROR(SEARCH(".", $A8)))';
+            fParentName.custom.rule.formula = `=AND($A${r}<>"", ISERROR(SEARCH(".", $A${r})))`;
             fParentName.custom.format.fill.color = "#D9D9D9";
             fParentName.stopIfTrue = true;
             await context.sync();
@@ -198,8 +230,9 @@ export const FormattingLogic = {
 
             // --- BLOCK G: HOLIDAYS (SWAPPED UP) ---
             console.log("STEP 8: Applying Holidays...");
+            // Using IFERROR/ISERROR safety in case ListHolidays named range doesn't exist yet
             const fHol = gridRange.conditionalFormats.add(Excel.ConditionalFormatType.custom);
-            fHol.custom.rule.formula = '=COUNTIF(ListHolidays,K$6)>0';
+            fHol.custom.rule.formula = '=IFERROR(COUNTIF(ListHolidays,K$6)>0, FALSE)';
             fHol.custom.format.fill.color = "#C8C8C8"; 
             fHol.stopIfTrue = false;
             await context.sync();
@@ -210,7 +243,8 @@ export const FormattingLogic = {
             const fPTO = gridRange.conditionalFormats.add(Excel.ConditionalFormatType.custom);
             
             // Check if Date (K6) is within Start/End for ANYONE in the list
-            fPTO.custom.rule.formula = '=SUMPRODUCT((StartDate<=K$6)*((StartDate+NumberDays-1)>=K$6))>0';
+            // Using IFERROR to handle missing StartDate/NumberDays named ranges
+            fPTO.custom.rule.formula = '=IFERROR(SUMPRODUCT((StartDate<=K$6)*((StartDate+NumberDays-1)>=K$6))>0, FALSE)';
             fPTO.custom.format.fill.color = "#EAEAEA"; 
             fPTO.stopIfTrue = false;
             await context.sync();
