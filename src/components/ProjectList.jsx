@@ -2,14 +2,19 @@
 import ProjectTasks from './ProjectTasks';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Button, Card, Badge, Spinner, Row, Col } from 'react-bootstrap';
+import { Button, Card, Badge, Spinner, Row, Col, Form, Collapse } from 'react-bootstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faLocationArrow, faListCheck, faChevronRight, faUser, faCalendarDays, faArrowRight, faSyncAlt } from '@fortawesome/free-solid-svg-icons';
+import { faLocationArrow, faListCheck, faChevronRight, faUser, faCalendarDays, faArrowRight, faSyncAlt, faSortAmountDown, faSortAmountUp, faSliders } from '@fortawesome/free-solid-svg-icons';
 
 const ProjectList = ({ sheetName = "Houston", refreshTrigger, highlightId }) => {
     // --- STATE ---
     const [projects, setProjects] = useState([]);
+    const [teamMembers, setTeamMembers] = useState([]);
     const [isFetching, setIsFetching] = useState(false);
+    
+    const [filters, setFilters] = useState({ lead: "", percent: "" });
+    const [sortConfig, setSortConfig] = useState({ key: "id", direction: "asc" });
+    const [showControls, setShowControls] = useState(false);
     
     // VIEW STATE: Controls "List" vs "Detail" view
     const [selectedProject, setSelectedProject] = useState(null);
@@ -86,11 +91,17 @@ const ProjectList = ({ sheetName = "Houston", refreshTrigger, highlightId }) => 
 
                 const teamMap = {};
                 const teamRows = teamRange.text;
+                const members = [];
                 for (let i = 1; i < teamRows.length; i++) {
                     const firstName = teamRows[i]?.[0]?.trim() || "";
                     const lastName = teamRows[i]?.[1]?.trim() || "";
-                    if (firstName) teamMap[firstName.toLowerCase()] = `${firstName} ${lastName}`.trim();
+                    if (firstName) {
+                        const full = `${firstName} ${lastName}`.trim();
+                        teamMap[firstName.toLowerCase()] = full;
+                        members.push({ first: firstName, full: full });
+                    }
                 }
+                setTeamMembers(members);
 
                 const dataStartIndex = 7; 
                 if (footerRange.isNullObject) {
@@ -165,6 +176,40 @@ const ProjectList = ({ sheetName = "Houston", refreshTrigger, highlightId }) => 
 
     useEffect(() => { fetchProjects(); }, [refreshTrigger]);
 
+    // --- 4. FILTER & SORT LOGIC ---
+    const getProcessedProjects = () => {
+        let filtered = projects.filter(p => {
+            const matchLead = !filters.lead || p.lead === filters.lead;
+            const matchPercent = !filters.percent || p.percent === filters.percent;
+            return matchLead && matchPercent;
+        });
+
+        return filtered.sort((a, b) => {
+            let valA = a[sortConfig.key];
+            let valB = b[sortConfig.key];
+
+            if (sortConfig.key === 'id') {
+                valA = parseFloat(valA);
+                valB = parseFloat(valB);
+            } else if (sortConfig.key === 'percent') {
+                valA = parseInt(valA?.replace('%', '') || '0');
+                valB = parseInt(valB?.replace('%', '') || '0');
+            } else if (sortConfig.key === 'start' || sortConfig.key === 'end') {
+                valA = new Date(valA || 0).getTime();
+                valB = new Date(valB || 0).getTime();
+            } else {
+                valA = (valA || "").toString().toLowerCase();
+                valB = (valB || "").toString().toLowerCase();
+            }
+
+            if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
+            if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
+            return 0;
+        });
+    };
+
+    const processedProjects = getProcessedProjects();
+
     // --- VIEW ROUTER (The Switch) ---
     // If a project is selected, SHOW TASKS VIEW instead of List
     if (selectedProject) {
@@ -181,20 +226,79 @@ const ProjectList = ({ sheetName = "Houston", refreshTrigger, highlightId }) => 
         <div className="mt-4">
             <div className="d-flex justify-content-between align-items-center mb-2">
                 <h6 className="m-0 fw-bold text-primary">{sheetName} Active Projects ({projects.length})</h6>
-                <Button variant="link" size="sm" className="text-decoration-none p-0" onClick={fetchProjects}>
-                    {isFetching ? <Spinner animation="border" size="sm" /> : <><FontAwesomeIcon icon={faSyncAlt} className="me-1" /> Refresh</>}
-                </Button>
+                <div className="d-flex align-items-center">
+                    <Button variant="link" size="sm" className="text-decoration-none p-0 me-3 text-muted" onClick={() => setShowControls(!showControls)} title="Sort & Filter">
+                        <FontAwesomeIcon icon={faSliders} className={showControls ? "text-primary" : ""} />
+                    </Button>
+                    <Button variant="link" size="sm" className="text-decoration-none p-0" onClick={fetchProjects}>
+                        {isFetching ? <Spinner animation="border" size="sm" /> : <><FontAwesomeIcon icon={faSyncAlt} className="me-1" /> Refresh</>}
+                    </Button>
+                </div>
             </div>
 
-            {projects.length === 0 && !isFetching && (
-                <div className="text-center text-muted small mt-2">No projects found.</div>
+            {/* CONTROLS: FILTER & SORT */}
+            <Collapse in={showControls}>
+                <div>
+                    <div className="bg-light p-2 rounded mb-3 border shadow-sm small">
+                        <Row className="g-2">
+                            <Col xs={4}>
+                                <Form.Label className="small fw-bold text-muted mb-1 text-uppercase" style={{ fontSize: '0.65rem' }}>Filter Lead</Form.Label>
+                                <Form.Select size="sm" value={filters.lead} onChange={(e) => setFilters({...filters, lead: e.target.value})}>
+                                    <option value="">All Leads</option>
+                                    {teamMembers.map((m, i) => <option key={i} value={m.full}>{m.full}</option>)}
+                                </Form.Select>
+                            </Col>
+                            <Col xs={4}>
+                                <Form.Label className="small fw-bold text-muted mb-1 text-uppercase" style={{ fontSize: '0.65rem' }}>Filter Status</Form.Label>
+                                <Form.Select size="sm" value={filters.percent} onChange={(e) => setFilters({...filters, percent: e.target.value})}>
+                                    <option value="">All %</option>
+                                    {["0%", "25%", "50%", "75%", "100%"].map(v => <option key={v} value={v}>{v}</option>)}
+                                </Form.Select>
+                            </Col>
+                            <Col xs={4}>
+                                <Form.Label className="small fw-bold text-muted mb-1 text-uppercase" style={{ fontSize: '0.65rem' }}>Sort By</Form.Label>
+                                <div className="d-flex">
+                                <Form.Select 
+                                    size="sm" 
+                                    className="me-1"
+                                    value={sortConfig.key} 
+                                    onChange={(e) => setSortConfig({...sortConfig, key: e.target.value})}
+                                >
+                                    <option value="id">ID</option>
+                                    <option value="projectNumber">Proj #</option>
+                                    <option value="name">Name</option>
+                                    <option value="start">Start</option>
+                                    <option value="end">End</option>
+                                    <option value="percent">Complete</option>
+                                </Form.Select>
+                                <Button 
+                                    variant="outline-secondary" 
+                                    size="sm" 
+                                    onClick={() => setSortConfig({...sortConfig, direction: sortConfig.direction === 'asc' ? 'desc' : 'asc'})}
+                                >
+                                    <FontAwesomeIcon icon={sortConfig.direction === 'asc' ? faSortAmountUp : faSortAmountDown} />
+                                </Button>
+                                </div>
+                            </Col>
+                        </Row>
+                    </div>
+                </div>
+            </Collapse>
+
+            {processedProjects.length === 0 && !isFetching && (
+                <div className="text-center text-muted small mt-4">
+                    No projects found matching these criteria.<br/>
+                    <Button variant="link" size="sm" className="p-0 mt-1 text-decoration-none fw-bold" onClick={() => setFilters({ lead: "", percent: "" })}>
+                        Clear all filters
+                    </Button>
+                </div>
             )}
 
             <div 
                 ref={listContainerRef}
                 style={{ maxHeight: listHeight, overflowY: "auto", transition: "max-height 0.1s ease-out" }}
             >
-                {projects.map((p, index) => {
+                {processedProjects.map((p, index) => {
                     const isNew = highlightId && String(p.id) === String(highlightId);
                     return (
                         <Card 

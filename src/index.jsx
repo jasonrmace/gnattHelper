@@ -12,6 +12,7 @@ import { ChangelogLogic } from './utils/changelogLogic';
 import { TimecardLogic } from './utils/timecardLogic.jsx';
 import ProjectList from './components/ProjectList';
 import PTOManager from './components/PTOManager';
+import HomePage from './components/HomePage';
 import CreatePTO from './components/CreatePTO';
 import TeamManager from './components/TeamManager';
 import SubContractorManager from './components/SubContractorManager';
@@ -53,7 +54,7 @@ const LoadingOverlay = ({ isVisible, message }) => {
 function App() {
     // --- STATE ---
     const [version] = useState("v6.0.0"); 
-    const [activeTab, setActiveTab] = useState("HoustonList");
+    const [activeTab, setActiveTab] = useState("Home");
     const [isValidFile, setIsValidFile] = useState(false);
     const [currentName, setCurrentName] = useState("");
     const [hudText, setHudText] = useState("Ready");
@@ -369,6 +370,16 @@ function App() {
 
                 if (isGantt) {
                     setFileType('gantt');
+
+                    // Initial Load: Activate "Splash" sheet if it exists
+                    Excel.run(async (context) => {
+                        const splash = context.workbook.worksheets.getItemOrNullObject("Splash");
+                        splash.load("isNullObject");
+                        await context.sync();
+                        if (!splash.isNullObject) splash.activate();
+                        await context.sync();
+                    }).catch(() => {});
+
                     // B. Register Watchdog
                     await EventListeners.register();
 
@@ -535,6 +546,7 @@ function App() {
                     </div>
                 ) : (
                     <>
+                            {activeTab === "Home" && <HomePage setActiveTab={setActiveTab} />}
                         {activeTab === "HoustonList" && <ProjectList sheetName="Houston" refreshTrigger={refreshTrigger} highlightId={highlightId} />}
                         {activeTab === "DallasList" && <ProjectList sheetName="Dallas" refreshTrigger={refreshTrigger} highlightId={highlightId} />}
                         {activeTab === "AddProject" && <CreateProject onProjectCreated={handleProjectCreated} />}

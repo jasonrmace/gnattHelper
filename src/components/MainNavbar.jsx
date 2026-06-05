@@ -274,6 +274,7 @@ const MainNavbar = ({ activeTab, setActiveTab, isFileValid, unseenCount, fileTyp
                         <>
                             {fileType === 'gantt' && (
                                 <>
+                                    <Nav.Link eventKey="Home">Home</Nav.Link>
                                     <Nav.Link eventKey="HoustonList">Houston Projects</Nav.Link>
                                     <Nav.Link eventKey="DallasList">Dallas Projects</Nav.Link>
                                     <Nav.Link eventKey="AddProject">Add a New Project</Nav.Link>

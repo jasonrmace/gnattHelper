@@ -6,8 +6,8 @@ import { IdentityLogic } from '../utils/identityLogic';
 import { FormattingLogic } from '../utils/formattingLogic_v2';
 import { VisualLogic } from '../utils/visualLogic';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faArrowLeft, faFolderPlus, faClipboardList, faLocationArrow, faPlus, faPencil, faTrash, faUser, faCalendarDays, faArrowRight } from '@fortawesome/free-solid-svg-icons';
-import { Button, Card, Badge, Spinner, Modal, ButtonGroup, Form, Row, Col, Alert } from 'react-bootstrap';
+import { faArrowLeft, faFolderPlus, faClipboardList, faLocationArrow, faPlus, faPencil, faTrash, faUser, faCalendarDays, faArrowRight, faSortAmountDown, faSortAmountUp, faSliders } from '@fortawesome/free-solid-svg-icons';
+import { Button, Card, Badge, Spinner, Modal, ButtonGroup, Form, Row, Col, Alert, Collapse } from 'react-bootstrap';
 
 const ProjectTasks = ({ project, onBack }) => {
     const [tasks, setTasks] = useState([]);
@@ -20,6 +20,10 @@ const ProjectTasks = ({ project, onBack }) => {
     const [formMode, setFormMode] = useState("add");
     const [formData, setFormData] = useState({ name: "", lead: "", start: "", end: "", percent: "0%" });
     const [status, setStatus] = useState("");
+
+    const [filters, setFilters] = useState({ lead: "", percent: "" });
+    const [sortConfig, setSortConfig] = useState({ key: "id", direction: "asc" });
+    const [showControls, setShowControls] = useState(false);
 
     // --- 1. INITIAL LOADING ---
     useEffect(() => {
@@ -278,6 +282,49 @@ const ProjectTasks = ({ project, onBack }) => {
         }
     };
 
+    // --- 5. FILTER & SORT LOGIC ---
+    const getProcessedTasks = () => {
+        let filtered = tasks.filter(t => {
+            // Lead in task object is the First Name
+            const matchLead = !filters.lead || t.lead === filters.lead;
+            const matchPercent = !filters.percent || t.percent === filters.percent;
+            return matchLead && matchPercent;
+        });
+
+        return filtered.sort((a, b) => {
+            let valA = a[sortConfig.key];
+            let valB = b[sortConfig.key];
+
+            if (sortConfig.key === 'id') {
+                // Version-style sort for "4.1", "4.1.1"
+                const aParts = valA.split('.').map(Number);
+                const bParts = valB.split('.').map(Number);
+                for (let i = 0; i < Math.max(aParts.length, bParts.length); i++) {
+                    const numA = aParts[i] || 0;
+                    const numB = bParts[i] || 0;
+                    if (numA !== numB) return sortConfig.direction === 'asc' ? numA - numB : numB - numA;
+                }
+                return 0;
+            } else if (sortConfig.key === 'percent') {
+                valA = parseInt(valA?.replace('%', '') || '0');
+                valB = parseInt(valB?.replace('%', '') || '0');
+            } else if (sortConfig.key === 'start' || sortConfig.key === 'end') {
+                // Handle Excel dates or strings
+                valA = new Date(valA || 0).getTime();
+                valB = new Date(valB || 0).getTime();
+            } else {
+                valA = (valA || "").toString().toLowerCase();
+                valB = (valB || "").toString().toLowerCase();
+            }
+
+            if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
+            if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
+            return 0;
+        });
+    };
+
+    const processedTasks = getProcessedTasks();
+
     return (
         <div className="mt-4">
             {/* HEADER */}
@@ -291,22 +338,78 @@ const ProjectTasks = ({ project, onBack }) => {
                         <small className="text-muted" style={{fontSize: "0.7rem"}}>Project {project.id} Task Manager</small> {/* Project ID is already a string */}
                     </div>
                 </div>
-                <Button variant="primary" size="sm" onClick={openAddModal}>
-                    <FontAwesomeIcon icon={faPlus} className="me-1" /> Add Task
-                </Button>
+                <div className="d-flex align-items-center">
+                    <Button variant="link" size="sm" className="text-muted me-2 p-0" onClick={() => setShowControls(!showControls)} title="Sort & Filter">
+                        <FontAwesomeIcon icon={faSliders} className={showControls ? "text-primary" : ""} />
+                    </Button>
+                    <Button variant="primary" size="sm" onClick={openAddModal}>
+                        <FontAwesomeIcon icon={faPlus} className="me-1" /> Add Task
+                    </Button>
+                </div>
             </div>
+
+            {/* CONTROLS: FILTER & SORT */}
+            <Collapse in={showControls}>
+                <div>
+                    <div className="bg-light p-2 rounded mb-3 border shadow-sm small">
+                        <Row className="g-2">
+                            <Col xs={4}>
+                                <Form.Label className="small fw-bold text-muted mb-1 text-uppercase" style={{ fontSize: '0.65rem' }}>Filter Lead</Form.Label>
+                                <Form.Select size="sm" value={filters.lead} onChange={(e) => setFilters({...filters, lead: e.target.value})}>
+                                    <option value="">All Leads</option>
+                                    {teamMembers.map((m, i) => <option key={i} value={m.first}>{m.full}</option>)}
+                                </Form.Select>
+                            </Col>
+                            <Col xs={4}>
+                                <Form.Label className="small fw-bold text-muted mb-1 text-uppercase" style={{ fontSize: '0.65rem' }}>Filter Status</Form.Label>
+                                <Form.Select size="sm" value={filters.percent} onChange={(e) => setFilters({...filters, percent: e.target.value})}>
+                                    <option value="">All %</option>
+                                    {["0%", "25%", "50%", "75%", "100%"].map(v => <option key={v} value={v}>{v}</option>)}
+                                </Form.Select>
+                            </Col>
+                            <Col xs={4}>
+                                <Form.Label className="small fw-bold text-muted mb-1 text-uppercase" style={{ fontSize: '0.65rem' }}>Sort By</Form.Label>
+                                <div className="d-flex">
+                                <Form.Select 
+                                    size="sm" 
+                                    className="me-1"
+                                    value={sortConfig.key} 
+                                    onChange={(e) => setSortConfig({...sortConfig, key: e.target.value})}
+                                >
+                                    <option value="id">Task #</option>
+                                    <option value="name">Name</option>
+                                    <option value="start">Start</option>
+                                    <option value="end">End</option>
+                                    <option value="percent">Complete</option>
+                                </Form.Select>
+                                <Button 
+                                    variant="outline-secondary" 
+                                    size="sm" 
+                                    onClick={() => setSortConfig({...sortConfig, direction: sortConfig.direction === 'asc' ? 'desc' : 'asc'})}
+                                >
+                                    <FontAwesomeIcon icon={sortConfig.direction === 'asc' ? faSortAmountUp : faSortAmountDown} />
+                                </Button>
+                                </div>
+                            </Col>
+                        </Row>
+                    </div>
+                </div>
+            </Collapse>
 
             {/* TASK LIST */}
             {isLoading ? (
                 <div className="text-center py-5"><Spinner animation="border" size="sm" variant="primary" /></div>
-            ) : tasks.length === 0 ? (
-                <div className="text-center text-muted small mt-5" aria-label="No tasks found">
+            ) : processedTasks.length === 0 ? (
+                <div className="text-center text-muted small mt-5 py-4" aria-label="No tasks found">
                     <FontAwesomeIcon icon={faClipboardList} size="2x" className="mb-2 text-secondary opacity-50" /><br/>
-                    No tasks found.
+                    No tasks found matching these criteria.<br/>
+                    <Button variant="link" size="sm" className="p-0 mt-2 text-decoration-none fw-bold" onClick={() => setFilters({ lead: "", percent: "" })}>
+                        Clear all filters
+                    </Button>
                 </div>
             ) : (
                 <div style={{ maxHeight: "calc(100vh - 220px)", overflowY: "auto", paddingRight: "4px" }}>
-                    {tasks.map((t, idx) => (
+                    {processedTasks.map((t, idx) => (
                         <Card key={idx} className="mb-2 shadow-sm border-0" style={{ marginLeft: `${t.depth * 24}px`, borderLeft: t.depth > 0 ? "3px solid #e9ecef" : "none" }}>
                             <Card.Body className="p-2">
                                 {/* TOP ROW: ID, NAME, BUTTONS */}
@@ -417,14 +520,20 @@ const ProjectTasks = ({ project, onBack }) => {
 
                     {formMode === "edit" && (
                         <Form.Group className="mb-2">
-                            <Form.Label className="small fw-bold text-muted">% COMPLETE</Form.Label>
-                            <Form.Select size="sm" value={formData.percent} onChange={(e) => setFormData({...formData, percent: e.target.value})}>
-                                <option value="0%">0%</option>
-                                <option value="25%">25%</option>
-                                <option value="50%">50%</option>
-                                <option value="75%">75%</option>
-                                <option value="100%">100%</option>
-                            </Form.Select>
+                            <div className="d-flex justify-content-between align-items-center mb-1">
+                                <Form.Label className="small fw-bold text-muted m-0">% COMPLETE</Form.Label>
+                                <Badge bg="primary" style={{ fontSize: '0.7rem' }}>{formData.percent || "0%"}</Badge>
+                            </div>
+                            <input 
+                                type="range"
+                                min={0}
+                                max={100}
+                                step={1}
+                                value={parseInt(formData.percent) || 0}
+                                onChange={(e) => setFormData({...formData, percent: e.target.value + "%"})}
+                                className="w-100 mt-2"
+                                style={{ accentColor: '#0d6efd', cursor: 'pointer' }}
+                            />
                         </Form.Group>
                     )}
 
