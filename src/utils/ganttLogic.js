@@ -6,9 +6,9 @@
 // ==============================================================================
 
 export const GanttLogic = {
-    updateProjectAverages: async (context) => {
+    updateProjectAverages: async (context, sheetName = "Houston") => {
         try {
-            const sheet = context.workbook.worksheets.getItem("GanttChart");
+            const sheet = context.workbook.worksheets.getItem(sheetName);
             
             // 1. Find the Footer (Data Boundary)
             const footerRange = sheet.getRange("A:A").find("DO NOT DELETE", { completeMatch: false, matchCase: false });

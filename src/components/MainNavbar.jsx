@@ -1,16 +1,23 @@
 /* global React, ReactBootstrap, Excel */
 import React, { useState } from 'react';
-import { Container, Nav, Navbar, NavDropdown, Badge } from 'react-bootstrap';
+import { Container, Nav, Navbar, NavDropdown, Badge, Modal, Form, Button, Spinner } from 'react-bootstrap';
 
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faBell, faPaintRoller, faUserCog, faFileExport, faPrint, faBars, faUserCircle, faCodeCompare, faTimes } from '@fortawesome/free-solid-svg-icons';
+import { faBell, faPaintRoller, faUserCog, faFileExport, faPrint, faBars, faUserCircle, faCodeCompare, faTimes, faTerminal, faCalendarAlt, faPlus } from '@fortawesome/free-solid-svg-icons';
 import { VisualLogic } from '../utils/visualLogic';
 import { FormattingLogic } from '../utils/formattingLogic_v2';
+import { ChangelogLogic } from '../utils/changelogLogic';
+import { IdentityLogic } from '../utils/identityLogic';
 import { faCircleUser } from '@fortawesome/free-regular-svg-icons';
+
+const AUTHORIZED_ADMINS = ["Rob", "Kevin", "Rob Kreps", "Kevin Rittner", "Jason", "Jason Mace"];
 
 const MainNavbar = ({ activeTab, setActiveTab, isFileValid, unseenCount, fileType, onAddTimecard }) => {
     const [expanded, setExpanded] = useState(false);
     const [isSyncing, setIsSyncing] = useState(false);
+
+    const [showVersionModal, setShowVersionModal] = useState(false);
+    const [versionInput, setVersionInput] = useState("");
 
     const triggerResizeLoop = () => {
         let count = 0;
@@ -32,7 +39,9 @@ const MainNavbar = ({ activeTab, setActiveTab, isFileValid, unseenCount, fileTyp
         setIsSyncing(true);
         try {
             await Excel.run(async (context) => {
-                await VisualLogic.refreshGridAlerts(context);
+                for (const name of ["Houston", "Dallas"]) {
+                    await VisualLogic.refreshGridAlerts(context, name);
+                }
             });
             console.log("Visuals Refreshed");
         } catch (e) {
@@ -49,7 +58,9 @@ const MainNavbar = ({ activeTab, setActiveTab, isFileValid, unseenCount, fileTyp
         setIsSyncing(true);
         try {
             await Excel.run(async (context) => {
-                await FormattingLogic.generateSmartRules(context);
+                for (const name of ["Houston", "Dallas"]) {
+                    await FormattingLogic.generateSmartRules(context, name);
+                }
             });
             console.log("Formatting Reset");
         } catch (e) {
@@ -60,15 +71,153 @@ const MainNavbar = ({ activeTab, setActiveTab, isFileValid, unseenCount, fileTyp
         }
     };
 
+    // --- 3. TOGGLE CHANGELOG VISIBILITY (Developer Only) ---
+    const handleToggleChangelog = async () => {
+        if (isSyncing) return;
+        setIsSyncing(true);
+        try {
+            await Excel.run(async (context) => {
+                const sheetNames = ["changelog", "Changelog", "Change Log"];
+                let targetSheet = null;
+
+                for (const name of sheetNames) {
+                    const sheet = context.workbook.worksheets.getItemOrNullObject(name);
+                    sheet.load("visibility, name");
+                    await context.sync();
+                    if (!sheet.isNullObject) {
+                        targetSheet = sheet;
+                        break;
+                    }
+                }
+
+                if (targetSheet) {
+                    const isVisible = targetSheet.visibility === Excel.SheetVisibility.visible;
+                    targetSheet.visibility = isVisible ? Excel.SheetVisibility.veryHidden : Excel.SheetVisibility.visible;
+                    await context.sync();
+                    if (window.GlobalToast) window.GlobalToast.success(`Sheet is now ${!isVisible ? "Visible" : "Very Hidden"}`);
+                } else {
+                    if (window.GlobalToast) window.GlobalToast.error("Changelog sheet not found.");
+                }
+            });
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setIsSyncing(false);
+            setExpanded(false);
+        }
+    };
+
+    // --- 4. TOGGLE VACATIONS VISIBILITY (Developer Only) ---
+    const handleToggleVacations = async () => {
+        if (isSyncing) return;
+        setIsSyncing(true);
+        try {
+            await Excel.run(async (context) => {
+                const sheetNames = ["Vacations", "Vacation-PTO", "PTO"];
+                let targetSheet = null;
+
+                for (const name of sheetNames) {
+                    const sheet = context.workbook.worksheets.getItemOrNullObject(name);
+                    sheet.load("visibility, name");
+                    await context.sync();
+                    if (!sheet.isNullObject) {
+                        targetSheet = sheet;
+                        break;
+                    }
+                }
+
+                if (targetSheet) {
+                    const isVisible = targetSheet.visibility === Excel.SheetVisibility.visible;
+                    targetSheet.visibility = isVisible ? Excel.SheetVisibility.veryHidden : Excel.SheetVisibility.visible;
+                    await context.sync();
+                    if (window.GlobalToast) window.GlobalToast.success(`${targetSheet.name} is now ${!isVisible ? "Visible" : "Very Hidden"}`);
+                } else {
+                    if (window.GlobalToast) window.GlobalToast.error("Vacations sheet not found.");
+                }
+            });
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setIsSyncing(false);
+            setExpanded(false);
+        }
+    };
+
+    // --- 5. TOGGLE TEAM VISIBILITY (Developer Only) ---
+    const handleToggleTeam = async () => {
+        if (isSyncing) return;
+        setIsSyncing(true);
+        try {
+            await Excel.run(async (context) => {
+                const sheetNames = ["Team", "TEAM"];
+                let targetSheet = null;
+
+                for (const name of sheetNames) {
+                    const sheet = context.workbook.worksheets.getItemOrNullObject(name);
+                    sheet.load("visibility, name");
+                    await context.sync();
+                    if (!sheet.isNullObject) {
+                        targetSheet = sheet;
+                        break;
+                    }
+                }
+
+                if (targetSheet) {
+                    const isVisible = targetSheet.visibility === Excel.SheetVisibility.visible;
+                    targetSheet.visibility = isVisible ? Excel.SheetVisibility.veryHidden : Excel.SheetVisibility.visible;
+                    await context.sync();
+                    if (window.GlobalToast) window.GlobalToast.success(`${targetSheet.name} is now ${!isVisible ? "Visible" : "Very Hidden"}`);
+                } else {
+                    if (window.GlobalToast) window.GlobalToast.error("Team sheet not found.");
+                }
+            });
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setIsSyncing(false);
+            setExpanded(false);
+        }
+    };
+
+    const handleLogVersion = async () => {
+        if (!versionInput) return;
+        setIsSyncing(true);
+        try {
+            await Excel.run(async (context) => {
+                // We log with "Admin" override so it triggers the global toast for all users
+                await ChangelogLogic.logChange(context, versionInput, "Admin");
+            });
+            if (window.GlobalToast) window.GlobalToast.success("Version entry logged as Admin.");
+            setVersionInput("");
+            setShowVersionModal(false);
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setIsSyncing(false);
+            setExpanded(false);
+        }
+    };
+
     return (
+        <>
         <Navbar 
             expand="lg" 
             bg="dark" 
             className="p-3 navbar-dark flex-shrink-0"
-            activekey={activeTab} 
+            activeKey={activeTab} 
             expanded={expanded} 
             onToggle={() => handleLayoutChange(!expanded)}
             onSelect={(selectedKey) => {
+                // Sync Excel worksheet activation with menu selection
+                if (selectedKey === "HoustonList" || selectedKey === "DallasList") {
+                    const targetSheet = selectedKey === "HoustonList" ? "Houston" : "Dallas";
+                    Excel.run(async (context) => {
+                        const sheet = context.workbook.worksheets.getItem(targetSheet);
+                        sheet.activate();
+                        await context.sync();
+                    }).catch(err => console.warn(`Navigation: Could not activate sheet "${targetSheet}".`, err));
+                }
+
                 // Only switch tabs if it's a valid eventKey (not undefined)
                 if (selectedKey) setActiveTab(selectedKey);
                 handleLayoutChange(false);
@@ -125,8 +274,15 @@ const MainNavbar = ({ activeTab, setActiveTab, isFileValid, unseenCount, fileTyp
                         <>
                             {fileType === 'gantt' && (
                                 <>
-                                    <Nav.Link eventKey="ProjectList">Active Projects</Nav.Link>
+                                    <Nav.Link eventKey="HoustonList">Houston Projects</Nav.Link>
+                                    <Nav.Link eventKey="DallasList">Dallas Projects</Nav.Link>
                                     <Nav.Link eventKey="AddProject">Add a New Project</Nav.Link>
+                                    <Nav.Link eventKey="SubContractorManager">Sub Contractors</Nav.Link>
+
+                                    <NavDropdown title="PTO/Vacation" id="pto-nav-dropdown">
+                                        <NavDropdown.Item eventKey="PTOManager">Manage PTO List</NavDropdown.Item>
+                                        <NavDropdown.Item eventKey="AddPTO">Add PTO / Vacation</NavDropdown.Item>
+                                    </NavDropdown>
                                     
                                     <NavDropdown 
                                         title="Options" 
@@ -145,11 +301,43 @@ const MainNavbar = ({ activeTab, setActiveTab, isFileValid, unseenCount, fileTyp
                                             Reset Formatting Rules
                                         </NavDropdown.Item>
                                         
+                                        {AUTHORIZED_ADMINS.includes(IdentityLogic.getIdentity()) && (
+                                            <NavDropdown.Item eventKey="TeamManager">
+                                                <FontAwesomeIcon icon={faUserCog} className="me-2 text-muted" /> 
+                                                Team Management
+                                            </NavDropdown.Item>
+                                        )}
+
                                         <NavDropdown.Divider />
                                         
-                                        <NavDropdown.Item href="#action/3.1"><FontAwesomeIcon icon={faFileExport} className="me-2 text-muted" /> Export CSV</NavDropdown.Item>
-                                        <NavDropdown.Item href="#action/3.2"><FontAwesomeIcon icon={faPrint} className="me-2 text-muted" /> Print View</NavDropdown.Item>
+                                        <NavDropdown.Item href="#action/3.1" className="d-flex justify-content-between align-items-center" disabled>
+                                            <span><FontAwesomeIcon icon={faFileExport} className="me-2 text-muted" /> Export CSV</span>
+                                            <Badge bg="secondary" pill className="ms-2" style={{ fontSize: '0.6rem' }}>Coming Soon</Badge>
+                                        </NavDropdown.Item>
+                                        <NavDropdown.Item href="#action/3.2" className="d-flex justify-content-between align-items-center" disabled>
+                                            <span><FontAwesomeIcon icon={faPrint} className="me-2 text-muted" /> Print View</span>
+                                            <Badge bg="secondary" pill className="ms-2" style={{ fontSize: '0.6rem' }}>Coming Soon</Badge>
+                                        </NavDropdown.Item>
                                     </NavDropdown>
+
+                                    {/* DEVELOPER MENU (Jason Only) */}
+                                    {IdentityLogic.getIdentity() === "Jason" && (
+                                        <NavDropdown title="Developer" id="dev-nav-dropdown" onToggle={() => triggerResizeLoop()}>
+                                            <NavDropdown.Item onClick={handleToggleChangelog}>
+                                                <FontAwesomeIcon icon={faTerminal} className="me-2 text-muted" /> Toggle Changelog
+                                            </NavDropdown.Item>
+                                            <NavDropdown.Item onClick={handleToggleVacations}>
+                                                <FontAwesomeIcon icon={faCalendarAlt} className="me-2 text-muted" /> Toggle Vacations
+                                            </NavDropdown.Item>
+                                            <NavDropdown.Item onClick={handleToggleTeam}>
+                                                <FontAwesomeIcon icon={faUserCog} className="me-2 text-muted" /> Toggle Team
+                                            </NavDropdown.Item>
+                                            <NavDropdown.Divider />
+                                            <NavDropdown.Item onClick={() => { setShowVersionModal(true); setExpanded(false); }}>
+                                                <FontAwesomeIcon icon={faPlus} className="me-2 text-muted" /> Log Version Entry
+                                            </NavDropdown.Item>
+                                        </NavDropdown>
+                                    )}
                                 </>
                             )}
 
@@ -174,6 +362,33 @@ const MainNavbar = ({ activeTab, setActiveTab, isFileValid, unseenCount, fileTyp
                 </Nav>
             </Navbar.Collapse>
         </Navbar>
+
+        {/* VERSION ENTRY MODAL */}
+        <Modal show={showVersionModal} onHide={() => setShowVersionModal(false)} centered>
+            <Modal.Header closeButton className="py-2 bg-light">
+                <Modal.Title style={{fontSize: "1rem"}} className="fw-bold text-primary">Log Version/Admin Update</Modal.Title>
+            </Modal.Header>
+            <Modal.Body className="p-3">
+                <Form.Group>
+                    <Form.Label className="small fw-bold text-muted text-uppercase">Update Description</Form.Label>
+                    <Form.Control 
+                        as="textarea" 
+                        rows={3} 
+                        placeholder="e.g. Version 6.1: Added new Team Management features..." 
+                        value={versionInput}
+                        onChange={(e) => setVersionInput(e.target.value)}
+                    />
+                    <Form.Text className="text-muted small">This will trigger a blue notification for all users.</Form.Text>
+                </Form.Group>
+            </Modal.Body>
+            <Modal.Footer className="py-1 bg-light">
+                <Button variant="secondary" size="sm" onClick={() => setShowVersionModal(false)}>Cancel</Button>
+                <Button variant="primary" size="sm" onClick={handleLogVersion} disabled={isSyncing || !versionInput}>
+                    {isSyncing ? <Spinner animation="border" size="sm" /> : "Log Update"}
+                </Button>
+            </Modal.Footer>
+        </Modal>
+        </>
     );
 }
 

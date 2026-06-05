@@ -4,15 +4,18 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faUserCog, faUserCircle } from '@fortawesome/free-solid-svg-icons';
 import { IdentityLogic } from '../utils/identityLogic';
 
-const GANTT_MAIN_FILE = "Houston Summer 2026.xlsx";
+const GANTT_MAIN_FILE = "Barbizon Texas Project Management.xlsx";
 
 const SettingsPage = ({ currentFileName }) => {
     const [currentIdentity, setCurrentIdentity] = useState('');
     const [teamMembers, setTeamMembers] = useState([]);
     const [selectedIdentity, setSelectedIdentity] = useState('');
     const [showSuccess, setShowSuccess] = useState(false);
+    const [passcode, setPasscode] = useState('');
 
     const canChangeIdentity = currentFileName === GANTT_MAIN_FILE;
+    const protectedIdentities = ["Rob", "Kevin", "Rob Kreps", "Kevin Rittner", "Jason", "Jason Mace"];
+    const isProtected = protectedIdentities.includes(selectedIdentity);
 
     useEffect(() => {
         const fetchSettings = async () => {
@@ -28,13 +31,32 @@ const SettingsPage = ({ currentFileName }) => {
 
     const handleIdentityChange = (e) => {
         setSelectedIdentity(e.target.value);
+        setPasscode(''); // Reset passcode when name changes
     };
 
     const handleSaveIdentity = () => {
         if (selectedIdentity) {
+            const isAdmin = ["Rob", "Kevin", "Rob Kreps", "Kevin Rittner"].includes(selectedIdentity);
+            const isDev = ["Jason", "Jason Mace"].includes(selectedIdentity);
+
+            if (isAdmin && passcode !== "1947") {
+                window.GlobalToast.error("Incorrect passcode for administrative identity.");
+                return;
+            }
+            if (isDev && passcode !== "2023") {
+                window.GlobalToast.error("Incorrect passcode for developer identity.");
+                return;
+            }
+
             IdentityLogic.setIdentity(selectedIdentity);
             setCurrentIdentity(selectedIdentity);
             setShowSuccess(true);
+
+            // Trigger toast and badge refresh for the newly selected identity
+            if (window.RefreshBadge) {
+                window.RefreshBadge(true); // true clears existing toasts first
+            }
+
             window.GlobalToast.success(`Identity updated to ${selectedIdentity}!`);
             setTimeout(() => setShowSuccess(false), 3000);
         }
@@ -71,9 +93,25 @@ const SettingsPage = ({ currentFileName }) => {
                                 </option>
                             ))}
                         </Form.Select>
+
+                        {isProtected && (
+                            <Form.Group className="mt-3 animate-enter">
+                                <Form.Label className="small fw-bold text-danger">
+                                    {["Jason", "Jason Mace"].includes(selectedIdentity) ? "DEVELOPER" : "ADMIN"} PASSCODE REQUIRED
+                                </Form.Label>
+                                <Form.Control
+                                    size="sm"
+                                    type="password"
+                                    placeholder="Enter passcode to claim this identity..."
+                                    value={passcode}
+                                    onChange={(e) => setPasscode(e.target.value)}
+                                />
+                            </Form.Group>
+                        )}
+
                         {!canChangeIdentity && (
                             <Alert variant="info" className="mt-2 small">
-                                You must load the file "Houston Summer 2026.xlsx" in order to change your identity. Ability to change in this file, coming soon!
+                                You must load the file "Barbizon Texas Project Management.xlsx" in order to change your identity. Ability to change in this file, coming soon!
                             </Alert>
                         )}
                         <Button variant="primary" size="sm" className="mt-2" onClick={handleSaveIdentity} disabled={!canChangeIdentity || !selectedIdentity}>Save Identity</Button>

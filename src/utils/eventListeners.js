@@ -12,6 +12,8 @@ import { ChangelogLogic } from './changelogLogic';
 // 3. On Change: Runs Formatting (Bars) -> Then Visuals (Counters).
 // ==============================================================================
 
+const GANTT_SHEETS = ["Houston", "Dallas"];
+
 export const EventListeners = {
     isRegistered: false,
 
@@ -24,10 +26,8 @@ export const EventListeners = {
                 // We assume "Team" sheet exists.
                 const teamTable = context.workbook.tables.getItemOrNullObject("Team");
                 const teamSheet = context.workbook.worksheets.getItem("Team");
-                const ganttSheet = context.workbook.worksheets.getItem("GanttChart");
 
                 teamSheet.load("id, name");
-                ganttSheet.load("id, name");
 
                 // We try to find the "Vacations" table to see where it lives.
                 const vacTable = context.workbook.tables.getItemOrNullObject("Vacations");
@@ -46,8 +46,11 @@ export const EventListeners = {
                 }
 
                 // 3. REGISTER 'GANTT' LISTENER
-                ganttSheet.onChanged.add(handleGanttChange);
-                console.log(`✅ Watching Gantt Sheet: ${ganttSheet.name}`);
+                for (const name of GANTT_SHEETS) {
+                    const sheet = context.workbook.worksheets.getItem(name);
+                    sheet.onChanged.add(handleGanttChange);
+                    console.log(`✅ Watching Gantt Sheet: ${name}`);
+                }
 
                 // 4. REGISTER 'VACATIONS' LISTENER (If on a different sheet)
                 if (!vacTable.isNullObject) {
@@ -106,12 +109,16 @@ async function handleMetadataChange(event) {
         await Excel.run(async (context) => {
             // STEP 1: Formatting (Heavy Lifting - Bars/Colors)
             console.log(">> Running Formatting Logic...");
-            await FormattingLogic.generateSmartRules(context);
+            for (const name of GANTT_SHEETS) {
+                await FormattingLogic.generateSmartRules(context, name);
+            }
 
             // STEP 2: Visuals (Overlays - Counters/Popups)
             // Must run AFTER formatting because formatting clears the grid
             console.log(">> Running Visual Logic...");
-            await VisualLogic.refreshGridAlerts(context);
+            for (const name of GANTT_SHEETS) {
+                await VisualLogic.refreshGridAlerts(context, name);
+            }
         });
     }, 1500); // 1.5 second delay
 }

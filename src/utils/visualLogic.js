@@ -12,10 +12,10 @@ export const VisualLogic = {
     /**
      * Full refresh of all date alerts on the grid.
      */
-    refreshGridAlerts: async (context) => {
-        if (window.GlobalLoader) window.GlobalLoader.show("Syncing Visuals...");
+    refreshGridAlerts: async (context, sheetName = "Houston") => {
+        if (window.GlobalLoader) window.GlobalLoader.show(`Syncing ${sheetName} Alerts...`);
         try {
-            const sheet = context.workbook.worksheets.getItem("GanttChart");
+            const sheet = context.workbook.worksheets.getItem(sheetName);
             const footerRange = sheet.getRange("A:A").find("DO NOT DELETE", { completeMatch: false, matchCase: false });
             footerRange.load("rowIndex");
             await context.sync();
@@ -23,7 +23,7 @@ export const VisualLogic = {
             const startRow = 7; 
             const rowCount = footerRange.rowIndex - startRow;
 
-            await VisualLogic.refreshRange(context, startRow, rowCount);
+            await VisualLogic.refreshRange(context, sheetName, startRow, rowCount);
         } catch (error) {
             console.error(error);
         } finally {
@@ -34,13 +34,35 @@ export const VisualLogic = {
     /**
      * Targeted refresh for specific rows (e.g., a newly created project).
      */
-    refreshRange: async (context, startRow, rowCount) => {
+    refreshRange: async (context, sheetName, startRow, rowCount) => {
         try {
-            const sheet = context.workbook.worksheets.getItem("GanttChart");
+            const sheet = context.workbook.worksheets.getItem(sheetName);
+            const teamSheet = context.workbook.worksheets.getItem("Team");
 
             // 1. LOAD CONFIG DATA (Holidays & PTO)
             let holidayData = [];
             let ptoData = { names: [], starts: [], days: [] };
+            let officeMap = {};
+
+            // A0. Load Team Office Map
+            const teamTable = teamSheet.tables.getItemOrNullObject("Team");
+            teamTable.load("isNullObject");
+            await context.sync();
+
+            if (!teamTable.isNullObject) {
+                const nameCol = teamTable.columns.getItem("First Name").getDataBodyRange();
+                const officeCol = teamTable.columns.getItem("Office").getDataBodyRange();
+                nameCol.load("values");
+                officeCol.load("values");
+                await context.sync();
+
+                nameCol.values.forEach((val, i) => {
+                    const name = val[0]?.toString().toUpperCase().trim();
+                    if (name) {
+                        officeMap[name] = officeCol.values[i][0];
+                    }
+                });
+            }
 
             // A. Load Holidays Table
             const holidayTable = sheet.tables.getItemOrNullObject("Holidays");
@@ -115,11 +137,12 @@ export const VisualLogic = {
                         for (let i = 0; i < ptoData.names.length; i++) {
                             const start = ptoData.starts[i];
                             const duration = ptoData.days[i];
+                            const name = ptoData.names[i]?.toString().toUpperCase().trim();
                             
-                            if (typeof start === 'number' && typeof duration === 'number') {
+                            if (typeof start === 'number' && typeof duration === 'number' && officeMap[name] === sheetName) {
                                 const end = start + duration - 1;
                                 if (serialDate >= start && serialDate <= end) {
-                                    ptoNames.push(ptoData.names[i]);
+                                    ptoNames.push(name);
                                 }
                             }
                         }

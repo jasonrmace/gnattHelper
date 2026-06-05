@@ -16,14 +16,14 @@ export const FormattingLogic = {
      * Performs a full reset of the sheet formatting.
      * Discovery logic for start/end rows stays here.
      */
-    generateSmartRules: async (context) => {
+    generateSmartRules: async (context, sheetName = "Houston") => {
         console.log("Formatting Engine: Starting...");
         
         // 1. SHOW SPINNER (Referencing global loader from index.jsx)
         if (window.GlobalLoader) window.GlobalLoader.show("Applying Rules...");
 
         try {
-            const sheet = context.workbook.worksheets.getItem("GanttChart");
+            const sheet = context.workbook.worksheets.getItem(sheetName);
             const teamSheet = context.workbook.worksheets.getItem("Team");
 
             // 1. DEFINE RANGES
@@ -64,7 +64,7 @@ export const FormattingLogic = {
             // CRITICAL: Sync after clearing to reset the CF engine state
             await context.sync();
 
-            await FormattingLogic.applyRulesToRange(context, startRow, actualRowCount, colCount);
+            await FormattingLogic.applyRulesToRange(context, sheetName, startRow, actualRowCount, colCount);
         } catch (error) {
             console.error("Formatting Logic Error:", error);
         } finally {
@@ -76,9 +76,9 @@ export const FormattingLogic = {
      * Applies logic to a SPECIFIC range without clearing existing rules elsewhere.
      * Use this for new rows to ensure they inherit the Gantt behavior.
      */
-    applyRulesToRange: async (context, startRow, rowCount, colCount) => {
+    applyRulesToRange: async (context, sheetName, startRow, rowCount, colCount) => {
         try {
-            const sheet = context.workbook.worksheets.getItem("GanttChart");
+            const sheet = context.workbook.worksheets.getItem(sheetName);
             const teamSheet = context.workbook.worksheets.getItem("Team");
             
             const gridRange = sheet.getRangeByIndexes(startRow, 10, rowCount, colCount);
@@ -98,6 +98,7 @@ export const FormattingLogic = {
             // LOAD TEAM COLORS
             console.log("STEP 2: Fetching Colors...");
             let teamRules = [];
+            let officeMap = {}; // Map: { NAME: OFFICE }
             const teamTable = teamSheet.tables.getItemOrNullObject("Team");
             teamTable.load("isNullObject");
             await context.sync();
@@ -111,15 +112,24 @@ export const FormattingLogic = {
                 if (rowCount.value > 0) {
                     const nameCol = teamTable.columns.getItem("First Name").getDataBodyRange();
                     const colorCol = teamTable.columns.getItem("Color").getDataBodyRange();
+                    const officeCol = teamTable.columns.getItem("Office").getDataBodyRange();
                     nameCol.load("values");
+                    officeCol.load("values");
                     const colorProps = colorCol.getCellProperties({ format: { fill: { color: true } } });
                     await context.sync();
 
                     const names = nameCol.values;
                     const colors = colorProps.value;
+                    const offices = officeCol.values;
             
                     for (let i = 0; i < names.length; i++) {
                         const rawName = names[i][0];
+                        const office = offices[i][0];
+                        
+                        if (rawName) {
+                            officeMap[rawName.toString().toUpperCase().trim()] = office;
+                        }
+
                         if (colors[i] && colors[i][0]) {
                             let hex = colors[i][0].format.fill.color;
                             let isInvalid = !hex || hex === "null" || (typeof hex === 'string' && (hex.toUpperCase() === "#FFFFFF" || hex.length !== 7));
@@ -239,14 +249,41 @@ export const FormattingLogic = {
             console.log(">> Holidays Applied.");
 
             // --- BLOCK F: PTO (SWAPPED DOWN - HIGHER PRIORITY) ---
-            console.log("STEP 9: Applying PTO (Global Column)...");
-            const fPTO = gridRange.conditionalFormats.add(Excel.ConditionalFormatType.custom);
+            console.log(`STEP 9: Applying PTO for ${sheetName}...`);
             
-            // Check if Date (K6) is within Start/End for ANYONE in the list
-            // Using IFERROR to handle missing StartDate/NumberDays named ranges
-            fPTO.custom.rule.formula = '=IFERROR(SUMPRODUCT((StartDate<=K$6)*((StartDate+NumberDays-1)>=K$6))>0, FALSE)';
-            fPTO.custom.format.fill.color = "#EAEAEA"; 
-            fPTO.stopIfTrue = false;
+            // 1. Load PTO Named Ranges
+            const rngWho = context.workbook.names.getItemOrNullObject("Who").getRangeOrNullObject();
+            const rngStart = context.workbook.names.getItemOrNullObject("StartDate").getRangeOrNullObject();
+            const rngDays = context.workbook.names.getItemOrNullObject("NumberDays").getRangeOrNullObject();
+
+            rngWho.load(["values", "isNullObject"]);
+            rngStart.load(["values", "isNullObject"]);
+            rngDays.load(["values", "isNullObject"]);
+            await context.sync();
+
+            if (!rngWho.isNullObject && rngWho.values) {
+                const ptoNames = rngWho.values;
+                const ptoStarts = rngStart.values;
+                const ptoDays = rngDays.values;
+
+                for (let i = 0; i < ptoNames.length; i++) {
+                    const name = ptoNames[i][0]?.toString().toUpperCase().trim();
+                    const start = ptoStarts[i][0];
+                    const days = ptoDays[i][0];
+
+                    // Only apply if the person belongs to THIS office
+                    if (name && officeMap[name] === sheetName && typeof start === 'number') {
+                        const end = start + days - 1;
+                        const fPTO = gridRange.conditionalFormats.add(Excel.ConditionalFormatType.custom);
+                        fPTO.custom.rule.formula = `=AND(K$6>=${start}, K$6<=${end})`;
+                        fPTO.custom.format.fill.color = "#EAEAEA";
+                        fPTO.stopIfTrue = false;
+
+                        // Batch sync to avoid request overflow
+                        if (i % 5 === 0) await context.sync();
+                    }
+                }
+            }
             await context.sync();
             console.log(">> PTO Applied.");
 

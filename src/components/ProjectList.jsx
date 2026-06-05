@@ -6,7 +6,7 @@ import { Button, Card, Badge, Spinner, Row, Col } from 'react-bootstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faLocationArrow, faListCheck, faChevronRight, faUser, faCalendarDays, faArrowRight, faSyncAlt } from '@fortawesome/free-solid-svg-icons';
 
-const ProjectList = ({ refreshTrigger, highlightId }) => {
+const ProjectList = ({ sheetName = "Houston", refreshTrigger, highlightId }) => {
     // --- STATE ---
     const [projects, setProjects] = useState([]);
     const [isFetching, setIsFetching] = useState(false);
@@ -50,7 +50,7 @@ const ProjectList = ({ refreshTrigger, highlightId }) => {
     const handleJump = async (rowIndex) => {
         try {
             await Excel.run(async (context) => {
-                const sheet = context.workbook.worksheets.getItem("GanttChart");
+                const sheet = context.workbook.worksheets.getItem(sheetName);
                 sheet.activate();
                 const range = sheet.getRangeByIndexes(rowIndex, 0, 1, 1).getEntireRow();
                 range.select();
@@ -65,7 +65,7 @@ const ProjectList = ({ refreshTrigger, highlightId }) => {
         try {
             await Excel.run(async (context) => {
                 const teamSheet = context.workbook.worksheets.getItemOrNullObject("Team");
-                const sheet = context.workbook.worksheets.getItemOrNullObject("GanttChart");
+                const sheet = context.workbook.worksheets.getItemOrNullObject(sheetName);
                 
                 teamSheet.load("isNullObject");
                 sheet.load("isNullObject");
@@ -136,6 +136,7 @@ const ProjectList = ({ refreshTrigger, highlightId }) => {
                         const rawLead = row[2]?.trim() || "";
                         const fullLeadName = teamMap[rawLead.toLowerCase()] || rawLead;
                         projectsMap.set(id, {
+                            location: sheetName,
                             id: row[0], // Keep as string/raw to avoid float issues
                             projectNumber: row[projNumIdx],
                             rowIndex: currentRowIndex,
@@ -179,7 +180,7 @@ const ProjectList = ({ refreshTrigger, highlightId }) => {
     return (
         <div className="mt-4">
             <div className="d-flex justify-content-between align-items-center mb-2">
-                <h6 className="m-0 fw-bold text-primary">Active Projects ({projects.length})</h6>
+                <h6 className="m-0 fw-bold text-primary">{sheetName} Active Projects ({projects.length})</h6>
                 <Button variant="link" size="sm" className="text-decoration-none p-0" onClick={fetchProjects}>
                     {isFetching ? <Spinner animation="border" size="sm" /> : <><FontAwesomeIcon icon={faSyncAlt} className="me-1" /> Refresh</>}
                 </Button>

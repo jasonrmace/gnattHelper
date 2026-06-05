@@ -58,7 +58,7 @@ const ProjectTasks = ({ project, onBack }) => {
         setIsLoading(true);
         try {
             await Excel.run(async (context) => {
-                const sheet = context.workbook.worksheets.getItem("GanttChart");
+                const sheet = context.workbook.worksheets.getItem(project.location);
                 const footerRange = sheet.getRange("A:A").find("DO NOT DELETE", { completeMatch: false, matchCase: false });
                 footerRange.load("rowIndex");
                 await context.sync();
@@ -159,7 +159,7 @@ const ProjectTasks = ({ project, onBack }) => {
 
         try {
             await Excel.run(async (context) => {
-                const sheet = context.workbook.worksheets.getItem("GanttChart");
+                const sheet = context.workbook.worksheets.getItem(project.location);
 
                 if (formMode === "edit") {
                     const rowIndex = activeTask.rowIndex;
@@ -224,12 +224,12 @@ const ProjectTasks = ({ project, onBack }) => {
                     }
                     
                     // Only run full formatting on structural ADD, not EDIT
-                    await FormattingLogic.generateSmartRules(context);
+                    await FormattingLogic.generateSmartRules(context, project.location);
                     newRow.select();
                 }
 
                 // --- TRIGGER LOGIC ENGINE ---
-                await GanttLogic.updateProjectAverages(context);
+                await GanttLogic.updateProjectAverages(context, project.location);
                 await context.sync();
                 
                 setShowForm(false);
@@ -246,13 +246,13 @@ const ProjectTasks = ({ project, onBack }) => {
         if (!activeTask) return;
         try {
             await Excel.run(async (context) => {
-                const sheet = context.workbook.worksheets.getItem("GanttChart");
+                const sheet = context.workbook.worksheets.getItem(project.location);
                 await ChangelogLogic.logChange(context, `Deleted Task: "${activeTask.name}" from Project ${project.id}`);
                 const range = sheet.getRangeByIndexes(activeTask.rowIndex, 0, 1, 1).getEntireRow();
                 range.delete(Excel.DeleteShiftDirection.up);
 
                 // --- TRIGGER LOGIC ENGINE ---
-                await GanttLogic.updateProjectAverages(context);
+                await GanttLogic.updateProjectAverages(context, project.location);
                 await context.sync();
                 
                 setShowDelete(false);
@@ -267,7 +267,7 @@ const ProjectTasks = ({ project, onBack }) => {
     const handleJump = async (rowIndex) => {
         try {
             await Excel.run(async (context) => {
-                const sheet = context.workbook.worksheets.getItem("GanttChart");
+                const sheet = context.workbook.worksheets.getItem(project.location);
                 sheet.activate();
                 const range = sheet.getRangeByIndexes(rowIndex, 0, 1, 1).getEntireRow();
                 range.select();

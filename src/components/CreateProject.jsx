@@ -12,7 +12,7 @@ import { faFolderPlus } from '@fortawesome/free-solid-svg-icons';
 const CreateProject = ({ onProjectCreated }) => {
     // --- STATE ---
     const [teamMembers, setTeamMembers] = useState([]);
-    const [formData, setFormData] = useState({ name: "", lead: "", startDate: "", endDate: "", projectNumber: "", isServiceCall: false });
+    const [formData, setFormData] = useState({ name: "", lead: "", startDate: "", endDate: "", projectNumber: "", isServiceCall: false, location: "Houston" });
     const [status, setStatus] = useState({ msg: "", variant: "light" });
     const [isLoading, setIsLoading] = useState(false);
 
@@ -71,7 +71,7 @@ const CreateProject = ({ onProjectCreated }) => {
         let createdId = null;
         try {
             await Excel.run(async (context) => {
-                const sheet = context.workbook.worksheets.getItem("GanttChart");
+                const sheet = context.workbook.worksheets.getItem(formData.location);
 
                 // A. PREPARE SHEET (Clear Filters - Matches VBA Safety)
                 // Important: Inserting rows while filters are active can hide the new row
@@ -176,8 +176,8 @@ const CreateProject = ({ onProjectCreated }) => {
 
                 // H. TRIGGER LOGIC ENGINES (Phase 2 Integration)
                 // Ensures internal formulas are correct immediately
-                await FormattingLogic.generateSmartRules(context);
-                await GanttLogic.updateProjectAverages(context);
+                await FormattingLogic.generateSmartRules(context, formData.location);
+                await GanttLogic.updateProjectAverages(context, formData.location);
 
                 // Record the change
                 await ChangelogLogic.logChange(context, `Created Project: ${formData.name} (ID: ${newId})`);
@@ -188,12 +188,12 @@ const CreateProject = ({ onProjectCreated }) => {
                 await context.sync();
 
                 setStatus({ msg: `Project "${formData.name}" (ID: ${newId}) Created!`, variant: "success" });
-                setFormData({ name: "", lead: "", startDate: "", endDate: "", projectNumber: "", isServiceCall: false });
+                setFormData({ ...formData, name: "", lead: "", startDate: "", endDate: "", projectNumber: "", isServiceCall: false });
             });
 
             // Trigger refresh AFTER the Excel.run transaction is fully complete
             if (onProjectCreated) {
-                onProjectCreated(createdId);
+                onProjectCreated(createdId, formData.location);
             }
         } catch (error) {
             console.error(error);
@@ -239,6 +239,15 @@ const CreateProject = ({ onProjectCreated }) => {
                             {member.full}
                         </option>
                     ))}
+                </Form.Select>
+            </Form.Group>
+
+            {/* LOCATION SELECT */}
+            <Form.Group className="mb-2">
+                <Form.Label className="small fw-bold text-muted">LOCATION</Form.Label>
+                <Form.Select size="sm" value={formData.location} onChange={(e) => handleChange("location", e.target.value)}>
+                    <option value="Houston">Houston</option>
+                    <option value="Dallas">Dallas</option>
                 </Form.Select>
             </Form.Group>
 

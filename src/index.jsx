@@ -4,13 +4,17 @@ import ReactDOM from 'react-dom/client';
 import { Container, Alert, Spinner } from 'react-bootstrap';
 import toast, { Toaster } from 'react-hot-toast';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSpinner, faBell, faTimes, faCrosshairs, faUserCircle } from '@fortawesome/free-solid-svg-icons';
+import { faSpinner, faBell, faTimes, faCrosshairs, faUserCircle, faCalendarDays } from '@fortawesome/free-solid-svg-icons';
 
 import { IdentityLogic } from './utils/identityLogic';
 import { EventListeners } from './utils/eventListeners';
 import { ChangelogLogic } from './utils/changelogLogic';
 import { TimecardLogic } from './utils/timecardLogic.jsx';
 import ProjectList from './components/ProjectList';
+import PTOManager from './components/PTOManager';
+import CreatePTO from './components/CreatePTO';
+import TeamManager from './components/TeamManager';
+import SubContractorManager from './components/SubContractorManager';
 import CreateProject from './components/CreateProject';
 // Assuming these will also be converted to ES modules soon:
 import MainNavbar from './components/MainNavbar';
@@ -21,7 +25,9 @@ import TimecardView from './components/TimecardView';
 import CreateTimecardModal from './components/CreateTimecardModal';
 
 // 1. CONFIGURATION
-const GANTT_FILENAMES = ["Houston Summer 2026 [Macros].xlsm", "Houston Summer 2026.xlsx"];
+const GANTT_FILENAMES = ["Barbizon Texas Project Management.xlsx"];
+const DEPRECATED_FILENAMES = ["Houston Summer 2026 [Macros].xlsm", "Houston Summer 2026.xlsx"];
+const GANTT_SHEET_NAMES = ["Houston", "Dallas"];
 const TIMECARD_PREFIX = "2026_Timecard_Template_";
 const PM_TIMELOG_PREFIX = "PM_TIMELOG_";
 
@@ -46,8 +52,8 @@ const LoadingOverlay = ({ isVisible, message }) => {
 
 function App() {
     // --- STATE ---
-    const [version] = useState("v5.13.3"); 
-    const [activeTab, setActiveTab] = useState("ProjectList");
+    const [version] = useState("v6.0.0"); 
+    const [activeTab, setActiveTab] = useState("HoustonList");
     const [isValidFile, setIsValidFile] = useState(false);
     const [currentName, setCurrentName] = useState("");
     const [hudText, setHudText] = useState("Ready");
@@ -81,24 +87,207 @@ function App() {
         console.log("Triggering Refresh (1s delay)...");
         setTimeout(() => {
             setRefreshTrigger(prev => prev + 1);
-        }, 1000);
+                }, 1000);
     };
 
-    const handleProjectCreated = (newId) => {
-        setHighlightId(newId);
-        setActiveTab("ProjectList");
-        triggerRefresh();
-        // Clear highlight after 10 seconds so it doesn't persist forever
-        setTimeout(() => setHighlightId(null), 10000);
-    };
+    const fetchUnseenCount = async (clearFirst = false) => {
+        if (clearFirst) toast.dismiss();
 
-    const fetchUnseenCount = async () => {
         try {
             await Excel.run(async (context) => {
+                const user = IdentityLogic.getIdentity();
+                if (!user) return;
+
+                const adminUsers = ["Rob", "Kevin", "Rob Kreps", "Kevin Rittner"];
+                const isAdmin = adminUsers.includes(user);
+
+                // 1. Update the Badge Count
                 const count = await ChangelogLogic.getUnseenCount(context);
                 setUnseenCount(count);
+
+                // 2. Fetch specific logs for toasts
+                const adminLogs = await ChangelogLogic.getUnseenAdminLogs(context);
+                const ptoLogs = isAdmin ? await ChangelogLogic.getUnseenPTOLogs(context) : [];
+
+                // 3. Show individual toasts for Admin updates (Global broadcasts)
+                adminLogs.forEach(log => {
+                    toast.custom((t) => (
+                        <div className={`${t.visible ? 'animate-enter' : 'animate-leave'} bg-white shadow-lg rounded-lg pointer-events-auto d-flex border border-info`}
+                             style={{ minWidth: '350px' }}>
+                            <div className="flex-grow-1 p-4">
+                                <div className="d-flex align-items-start h-100">
+                                    <FontAwesomeIcon icon={faBell} className="text-info mt-1" />
+                                    <div className="ms-3">
+                                        <p className="text-sm font-bold text-dark mb-1" style={{ fontSize: '0.9rem' }}>
+                                            New Administrative Update
+                                        </p>
+                                        <p className="text-sm text-muted mb-0" style={{ fontSize: '0.85rem' }}>
+                                            {log.change}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="d-flex border-start border-light align-items-stretch">
+                                <button
+                                    onClick={async () => {
+                                        await ChangelogLogic.markAsSeen(log.change, log.timestamp);
+                                        toast.dismiss(t.id);
+                                        fetchUnseenCount();
+                                    }}
+                                    className="btn btn-link text-decoration-none border-0 px-4 py-0 d-flex align-items-center justify-content-center text-sm font-bold text-info hover:bg-light focus:outline-none"
+                                    style={{ borderRadius: '0 8px 8px 0', fontSize: '0.85rem' }}
+                                >
+                                    Close
+                                </button>
+                            </div>
+                        </div>
+                    ), { duration: Infinity, id: `admin-update-${log.timestamp}` });
+                });
+
+                // 4. Show summary toast for standard updates
+                // We subtract ptoLogs because those are handled separately with Approve/Deny buttons
+                const trackedCount = adminLogs.length + ptoLogs.length;
+                const nonTrackedCount = count - trackedCount;
+
+                if (nonTrackedCount > 0) {
+                    toast.custom((t) => (
+                        <div className={`${t.visible ? 'animate-enter' : 'animate-leave'} bg-white shadow-lg rounded-lg pointer-events-auto d-flex border border-light`}
+                             style={{ minWidth: '350px' }}>
+                            <div className="flex-grow-1 p-4">
+                                <div className="d-flex align-items-start h-100">
+                                    <FontAwesomeIcon icon={faBell} className="text-primary mt-1" />
+                                    <div className="ms-3">
+                                        <p className="text-sm font-medium text-dark mb-1" style={{ fontSize: '0.9rem' }}>
+                                            You have missed {nonTrackedCount} {nonTrackedCount === 1 ? 'update' : 'updates'}.
+                                        </p>
+                                        <button 
+                                            className="btn btn-link p-0 border-0 fw-bold text-primary"
+                                            style={{ textDecoration: 'underline', fontSize: '0.85rem' }}
+                                            onClick={() => {
+                                                setActiveTab("Updates");
+                                                toast.dismiss(t.id);
+                                            }}
+                                        >
+                                            View history here
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="d-flex border-start border-light align-items-stretch">
+                                <button
+                                    onClick={() => toast.dismiss(t.id)}
+                                    className="btn btn-link text-decoration-none border-0 px-4 py-0 d-flex align-items-center justify-content-center text-sm font-bold text-muted hover:bg-light focus:outline-none"
+                                    style={{ borderRadius: '0 8px 8px 0', fontSize: '0.85rem' }}
+                                >
+                                    Close
+                                </button>
+                            </div>
+                        </div>
+                    ), { 
+                        duration: 20000,
+                        id: 'unseen-summary'
+                    });
+                }
+
+                // 5. Show PTO Approve/Deny Toasts (Managers only)
+                if (isAdmin && ptoLogs.length > 0) {
+                    ptoLogs.forEach(log => {
+                        toast.custom((t) => (
+                            <div className={`${t.visible ? 'animate-enter' : 'animate-leave'} bg-white shadow-lg rounded-lg pointer-events-auto d-flex border border-warning`}
+                                 style={{ minWidth: '350px' }}>
+                                <div className="flex-grow-1 p-4">
+                                    <div className="d-flex align-items-start">
+                                        <FontAwesomeIcon icon={faCalendarDays} className="text-warning mt-1" />
+                                        <div className="ms-3">
+                                            <p className="text-sm font-bold text-dark mb-1" style={{ fontSize: '0.9rem' }}>
+                                                PTO Request: {log.author}
+                                            </p>
+                                            <p className="text-sm text-muted mb-0" style={{ fontSize: '0.85rem' }}>
+                                                {log.change}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="d-flex border-start border-light align-items-stretch">
+                                    <div className="d-flex flex-column border-start">
+                                        <button
+                                            onClick={() => {
+                                                setActiveTab("PTOManager");
+                                                toast.dismiss(t.id);
+                                            }}
+                                            className="btn btn-link text-decoration-none border-bottom px-3 py-2 d-flex align-items-center justify-content-center text-sm font-bold text-primary hover:bg-light"
+                                            style={{ fontSize: '0.75rem' }}
+                                        >
+                                            View
+                                        </button>
+                                        <button
+                                            onClick={async () => {
+                                                await ChangelogLogic.markAsSeen(log.change, log.timestamp);
+                                                toast.dismiss(t.id);
+                                                fetchUnseenCount();
+                                                window.GlobalToast.success("PTO Approved");
+                                            }}
+                                            className="btn btn-link text-decoration-none border-bottom px-3 py-2 d-flex align-items-center justify-content-center text-sm font-bold text-success hover:bg-light"
+                                            style={{ fontSize: '0.75rem' }}
+                                        >
+                                            Approve
+                                        </button>
+                                        <button
+                                            onClick={async () => {
+                                                await handleDenyPTO(log);
+                                                toast.dismiss(t.id);
+                                            }}
+                                            className="btn btn-link text-decoration-none px-3 py-2 d-flex align-items-center justify-content-center text-sm font-bold text-danger hover:bg-light"
+                                            style={{ fontSize: '0.75rem' }}
+                                        >
+                                            Deny
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        ), { duration: Infinity, id: `pto-update-${log.timestamp}` });
+                    });
+                }
             });
         } catch (e) { console.error(e); }
+    };
+
+    const handleDenyPTO = async (log) => {
+        window.GlobalLoader.show("Denying Request...");
+        try {
+            await Excel.run(async (context) => {
+                const table = context.workbook.tables.getItem("Vacations");
+                const range = table.getDataBodyRange();
+                range.load("values");
+                await context.sync();
+
+                // Description format: "Added PTO for [User]: [Start] to [End]"
+                // We extract the name and start date to find the specific row
+                const parts = log.change.split(":");
+                const namePart = parts[0].replace("Added PTO for ", "").trim();
+                const datePart = parts[1].split(" to ")[0].trim();
+
+                const rows = range.values;
+                let rowIndexToDelete = -1;
+
+                for (let i = 0; i < rows.length; i++) {
+                    if (rows[i][0] === namePart && rows[i][1] === datePart) {
+                        rowIndexToDelete = i;
+                        break;
+                    }
+                }
+
+                if (rowIndexToDelete !== -1) {
+                    table.rows.getItemAt(rowIndexToDelete).delete();
+                }
+
+                await ChangelogLogic.markAsSeen(log.change, log.timestamp);
+                await context.sync();
+                triggerRefresh();
+                window.GlobalToast.error(`PTO for ${namePart} denied and removed.`);
+            });
+        } catch (e) { console.error(e); }
+        finally { window.GlobalLoader.hide(); }
     };
 
     // --- EXPOSE LOADER TO WINDOW ---
@@ -152,6 +341,7 @@ function App() {
                 const fileName = decodedUrl.split(/[\\\/]/).pop();
                 setCurrentName(fileName);
 
+                const isDeprecated = DEPRECATED_FILENAMES.includes(fileName);
                 const isGantt = GANTT_FILENAMES.includes(fileName);
                 const isTimecard = fileName.startsWith(TIMECARD_PREFIX);
                 const isPmTimelog = fileName.startsWith(PM_TIMELOG_PREFIX);
@@ -165,8 +355,14 @@ function App() {
                     handleSelectionChange
                 );
 
+                if (isDeprecated) {
+                    setFileError("This file is no longer supported. Please use 'Barbizon Texas Project Management.xlsx' instead.");
+                    setHudText("Deprecated");
+                    return;
+                }
+
                 if (!isAllowed) {
-                    setFileError(`Helpers are locked for "${fileName}". Please open an approved Houston template.`);
+                    setFileError(`Helpers are locked for "${fileName}". Please open an approved file.`);
                     setHudText("Locked");
                     return;
                 }
@@ -176,94 +372,7 @@ function App() {
                     // B. Register Watchdog
                     await EventListeners.register();
 
-                    // D. Check for missed changes while user was away (including Admin specific ones)
-                    const { count, adminLogs } = await Excel.run(async (context) => {
-                        const c = await ChangelogLogic.getUnseenCount(context);
-                        const al = await ChangelogLogic.getUnseenAdminLogs(context);
-                        return { count: c, adminLogs: al };
-                    });
-                    setUnseenCount(count);
-
-                    // Show individual toasts for Admin updates
-                    adminLogs.forEach(log => {
-                        toast.custom((t) => (
-                            <div className={`${t.visible ? 'animate-enter' : 'animate-leave'} bg-white shadow-lg rounded-lg pointer-events-auto d-flex border border-info`}
-                                 style={{ minWidth: '350px' }}>
-                                <div className="flex-grow-1 p-4">
-                                    <div className="d-flex align-items-start h-100">
-                                        <FontAwesomeIcon icon={faBell} className="text-info mt-1" />
-                                        <div className="ms-3">
-                                            <p className="text-sm font-bold text-dark mb-1" style={{ fontSize: '0.9rem' }}>
-                                                New Administrative Update
-                                            </p>
-                                            <p className="text-sm text-muted mb-0" style={{ fontSize: '0.85rem' }}>
-                                                {log.change}
-                                            </p>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className="d-flex border-start border-light align-items-stretch">
-                                    <button
-                                        onClick={async () => {
-                                            await ChangelogLogic.markAsSeen(log.change, log.timestamp);
-                                            toast.dismiss(t.id);
-                                            // Refresh the badge count
-                                            fetchUnseenCount();
-                                        }}
-                                        className="btn btn-link text-decoration-none border-0 px-4 py-0 d-flex align-items-center justify-content-center text-sm font-bold text-info hover:bg-light focus:outline-none"
-                                        style={{ borderRadius: '0 8px 8px 0', fontSize: '0.85rem' }}
-                                    >
-                                        Close
-                                    </button>
-                                </div>
-                            </div>
-                        ), { 
-                            duration: Infinity, 
-                            id: `admin-update-${log.timestamp}` 
-                        });
-                    });
-
-                    // Show summary toast if there are missed updates
-                    const nonAdminCount = count - adminLogs.length;
-                    if (nonAdminCount > 0) {
-                        toast.custom((t) => (
-                            <div className={`${t.visible ? 'animate-enter' : 'animate-leave'} bg-white shadow-lg rounded-lg pointer-events-auto d-flex border border-light`}
-                                 style={{ minWidth: '350px' }}>
-                                <div className="flex-grow-1 p-4">
-                                    <div className="d-flex align-items-start h-100">
-                                        <FontAwesomeIcon icon={faBell} className="text-primary mt-1" />
-                                        <div className="ms-3">
-                                            <p className="text-sm font-medium text-dark mb-1" style={{ fontSize: '0.9rem' }}>
-                                                You have missed {nonAdminCount} {nonAdminCount === 1 ? 'update' : 'updates'}.
-                            </p>
-                                            <button 
-                                                className="btn btn-link p-0 border-0 fw-bold text-primary"
-                                                style={{ textDecoration: 'underline', fontSize: '0.85rem' }}
-                                                onClick={() => {
-                                                    setActiveTab("Updates");
-                                                    toast.dismiss(t.id);
-                                                }}
-                                            >
-                                                View history here
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className="d-flex border-start border-light align-items-stretch">
-                                    <button
-                                        onClick={() => toast.dismiss(t.id)}
-                                        className="btn btn-link text-decoration-none border-0 px-4 py-0 d-flex align-items-center justify-content-center text-sm font-bold text-muted hover:bg-light focus:outline-none"
-                                        style={{ borderRadius: '0 8px 8px 0', fontSize: '0.85rem' }}
-                                    >
-                                        Close
-                                    </button>
-                                </div>
-                            </div>
-                        ), { 
-                            duration: 20000,
-                            id: 'startup-unseen-summary'
-                        });
-                    }
+                    await fetchUnseenCount();
                 } else if (isTimecard) {
                     setFileType('timecard');
                     setActiveTab("TimecardDashboard");
@@ -320,11 +429,13 @@ function App() {
         try {
             await Excel.run(async (context) => {
                 const sheet = context.workbook.worksheets.getActiveWorksheet();
+                sheet.load("name");
                 const range = context.workbook.getSelectedRange();
                 range.load(["rowIndex", "rowCount"]);
                 await context.sync();
 
-                if (range.rowCount > 1 || range.rowIndex < 7) {
+                // Only run on Gantt sheets
+                if (range.rowCount > 1 || range.rowIndex < 7 || !GANTT_SHEET_NAMES.includes(sheet.name)) {
                     processingRef.current = false;
                     return;
                 }
@@ -337,7 +448,7 @@ function App() {
 
                 const currentID = idCell.text[0][0];
                 const currentName = nameCell.text[0][0];
-                let finalText = `Active Row: ${currentRowIndex + 1}`;
+                let finalText = `${sheet.name.toUpperCase()} | Row: ${currentRowIndex + 1}`;
 
                 if (currentID) {
                     const idNum = parseFloat(currentID);
@@ -424,8 +535,13 @@ function App() {
                     </div>
                 ) : (
                     <>
-                        {activeTab === "ProjectList" && <ProjectList refreshTrigger={refreshTrigger} highlightId={highlightId} />}
+                        {activeTab === "HoustonList" && <ProjectList sheetName="Houston" refreshTrigger={refreshTrigger} highlightId={highlightId} />}
+                        {activeTab === "DallasList" && <ProjectList sheetName="Dallas" refreshTrigger={refreshTrigger} highlightId={highlightId} />}
                         {activeTab === "AddProject" && <CreateProject onProjectCreated={handleProjectCreated} />}
+                        {activeTab === "PTOManager" && <PTOManager refreshTrigger={refreshTrigger} onNavigateToAdd={() => setActiveTab("AddPTO")} />}
+                        {activeTab === "SubContractorManager" && <SubContractorManager refreshTrigger={refreshTrigger} />}
+                        {activeTab === "TeamManager" && <TeamManager refreshTrigger={refreshTrigger} />}
+                        {activeTab === "AddPTO" && <CreatePTO onPTOCreated={triggerRefresh} />}
                         {activeTab === "TimecardDashboard" && <TimecardView currentFileName={currentName} refreshTrigger={refreshTrigger} />}
                         {activeTab === "PmTimelogDashboard" && (
                             <div className="text-center mt-5">
