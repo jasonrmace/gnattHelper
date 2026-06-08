@@ -79,12 +79,23 @@ export const EventListeners = {
 async function handleGanttChange(event) {
     if (event.source === Excel.EventSource.remote) {
         if (window.RefreshBadge) window.RefreshBadge();
-    }
 
-    // Structural changes (Insert/Delete) no longer require a full formatting reset
-    // because rules are applied to a large buffer (Row 8-2000) and Excel 
-    // handles range adjustments natively.
-    return;
+        // Check if a co-author is performing a heavy formatting update
+        await Excel.run(async (context) => {
+            const statusRange = context.workbook.names.getItemOrNullObject("GlobalFormattingStatus").getRangeOrNullObject();
+            statusRange.load(["isNullObject", "values"]);
+            await context.sync();
+
+            if (!statusRange.isNullObject) {
+                const status = statusRange.values[0][0];
+                if (status === "IN_PROGRESS") {
+                    if (window.GlobalLoader) window.GlobalLoader.show("A co-author is updating worksheet formatting...");
+                } else {
+                    if (window.GlobalLoader) window.GlobalLoader.hide();
+                }
+            }
+        });
+    }
 }
 
 // --- HANDLER 2: METADATA CHANGES (Debounced Global Refresh) ---

@@ -56,7 +56,7 @@ const LoadingOverlay = ({ isVisible, message }) => {
 
 function App() {
     // --- STATE ---
-    const [version] = useState("v6.1.0"); 
+    const [version] = useState("v6.1.1"); 
     const [activeTab, setActiveTab] = useState("Home");
     const [isValidFile, setIsValidFile] = useState(false);
     const [currentName, setCurrentName] = useState("");

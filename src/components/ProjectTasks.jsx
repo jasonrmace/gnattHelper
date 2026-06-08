@@ -178,6 +178,9 @@ const ProjectTasks = ({ project, onBack }) => {
                         sheet.getCell(rowIndex, 6).values = [[diff]];
                     }
                     sheet.getCell(rowIndex, 7).values = [[formData.percent]];
+
+                    // Surgical row update (Using 200 as a safe column count to cover EI and beyond)
+                    await FormattingLogic.applyRulesToRange(context, project.location, rowIndex, 1, 200);
                 } else {
                     // ADD NEW TASK LOGIC
                     let templateName = "Level2Task";
@@ -227,8 +230,8 @@ const ProjectTasks = ({ project, onBack }) => {
                         sheet.getCell(insertRowIndex, 6).values = [[diff]];
                     }
                     
-                    // Only run full formatting on structural ADD, not EDIT
-                    await FormattingLogic.generateSmartRules(context, project.location);
+                    // Surgical row update for the new row
+                    await FormattingLogic.applyRulesToRange(context, project.location, insertRowIndex, 1, 200);
                     newRow.select();
                 }
 

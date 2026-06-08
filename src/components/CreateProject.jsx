@@ -176,7 +176,7 @@ const CreateProject = ({ onProjectCreated }) => {
 
                 // H. TRIGGER LOGIC ENGINES (Phase 2 Integration)
                 // Ensures internal formulas are correct immediately
-                await FormattingLogic.generateSmartRules(context, formData.location);
+                await FormattingLogic.applyRulesToRange(context, formData.location, insertRowIndex, 1, 200);
                 await GanttLogic.updateProjectAverages(context, formData.location);
 
                 // Record the change
