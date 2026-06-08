@@ -56,7 +56,7 @@ const LoadingOverlay = ({ isVisible, message }) => {
 
 function App() {
     // --- STATE ---
-    const [version] = useState("v6.1.1"); 
+    const [version] = useState("v6.1.2"); 
     const [activeTab, setActiveTab] = useState("Home");
     const [isValidFile, setIsValidFile] = useState(false);
     const [currentName, setCurrentName] = useState("");
@@ -343,8 +343,8 @@ function App() {
                 }
 
                 const decodedUrl = decodeURI(url);
-                // Split by either forward slash / or backslash \ and get the last part
-                const fileName = decodedUrl.split(/[\\\/]/).pop();
+                // Strips query parameters (common in Web/SharePoint URLs) then splits by forward slash / or backslash \.
+                const fileName = decodedUrl.split('?')[0].split(/[\\\/]/).pop();
                 setCurrentName(fileName);
 
                 const isDeprecated = DEPRECATED_FILENAMES.includes(fileName);
