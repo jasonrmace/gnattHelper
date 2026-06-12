@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Container, Nav, Navbar, NavDropdown, Badge, Modal, Form, Button, Spinner } from 'react-bootstrap';
 
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faBell, faPaintRoller, faUserCog, faFileExport, faPrint, faBars, faUserCircle, faCodeCompare, faTimes, faTerminal, faCalendarAlt, faPlus } from '@fortawesome/free-solid-svg-icons';
+import { faBell, faPaintRoller, faUserCog, faFileExport, faPrint, faBars, faUserCircle, faCodeCompare, faTimes, faTerminal, faCalendarAlt, faPlus, faTriangleExclamation } from '@fortawesome/free-solid-svg-icons';
 import { VisualLogic } from '../utils/visualLogic';
 import { FormattingLogic } from '../utils/formattingLogic_v2';
 import { ChangelogLogic } from '../utils/changelogLogic';
@@ -12,7 +12,7 @@ import { faCircleUser } from '@fortawesome/free-regular-svg-icons';
 
 const AUTHORIZED_ADMINS = ["Rob", "Kevin", "Rob Kreps", "Kevin Rittner", "Jason", "Jason Mace"];
 
-const MainNavbar = ({ activeTab, setActiveTab, isFileValid, unseenCount, fileType, onAddTimecard }) => {
+const MainNavbar = ({ activeTab, setActiveTab, isFileValid, unseenCount, overdueCount, fileType, onAddTimecard, onUpdatesViewed, onClearHighlight, onNavReset }) => {
     const [expanded, setExpanded] = useState(false);
     const [isSyncing, setIsSyncing] = useState(false);
 
@@ -222,6 +222,8 @@ const MainNavbar = ({ activeTab, setActiveTab, isFileValid, unseenCount, fileTyp
             onSelect={(selectedKey) => {
                 // Sync Excel worksheet activation with menu selection
                 if (selectedKey === "HoustonList" || selectedKey === "DallasList") {
+                    if (onClearHighlight) onClearHighlight();
+                    if (onNavReset) onNavReset();
                     const targetSheet = selectedKey === "HoustonList" ? "Houston" : "Dallas";
                     Excel.run(async (context) => {
                         const sheet = context.workbook.worksheets.getItem(targetSheet);
@@ -290,6 +292,10 @@ const MainNavbar = ({ activeTab, setActiveTab, isFileValid, unseenCount, fileTyp
                                     <Nav.Link eventKey="HoustonList">Houston Projects</Nav.Link>
                                     <Nav.Link eventKey="DallasList">Dallas Projects</Nav.Link>
                                     <Nav.Link eventKey="AddProject">Add a New Project</Nav.Link>
+                                    <Nav.Link eventKey="OverdueTasks" className="d-flex align-items-center">
+                                        Overdue Tasks
+                                        {overdueCount > 0 && <Badge bg="danger" pill className="ms-2" style={{fontSize: '0.65rem'}}>{overdueCount}</Badge>}
+                                    </Nav.Link>
                                     <Nav.Link eventKey="SubContractorManager">Sub Contractors</Nav.Link>
 
                                     <NavDropdown title="PTO/Vacation" id="pto-nav-dropdown">

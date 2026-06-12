@@ -25,6 +25,7 @@ import UpdatesPage from './components/UpdatesPage';
 import TimecardView from './components/TimecardView';
 import CreateTimecardModal from './components/CreateTimecardModal';
 import BarbizonSpinner from './components/BarbizonSpinner';
+import OverdueTasks from './components/OverdueTasks';
 
 // 1. CONFIGURATION
 const GANTT_FILENAMES = ["Barbizon Texas Project Management.xlsx"];
@@ -66,7 +67,7 @@ const LoadingOverlay = ({ isVisible, message }) => {
 
 function App() {
     // --- STATE ---
-    const [version] = useState("v6.1.3"); 
+    const [version] = useState("v6.2.0"); 
     const [activeTab, setActiveTab] = useState("Home");
     const [isValidFile, setIsValidFile] = useState(false);
     const [currentName, setCurrentName] = useState("");
@@ -74,8 +75,11 @@ function App() {
     const [refreshTrigger, setRefreshTrigger] = useState(0);
     const [fileError, setFileError] = useState("");
     const [highlightId, setHighlightId] = useState(null);
+    const [navResetTrigger, setNavResetTrigger] = useState(0);
     const [fileType, setFileType] = useState(null); // 'gantt' or 'timecard'
     const [unseenCount, setUnseenCount] = useState(0);
+    const [overdueCount, setOverdueCount] = useState(0);
+    const [userOverdueCount, setUserOverdueCount] = useState(0);
     
     // LOADER & MODAL STATE
     const [isLoading, setIsLoading] = useState(false);
@@ -102,6 +106,50 @@ function App() {
         setTimeout(() => {
             setRefreshTrigger(prev => prev + 1);
                 }, 1000);
+    };
+
+    const fetchOverdueData = async () => {
+        try {
+            return await Excel.run(async (context) => {
+                const sheets = ["Houston", "Dallas"];
+                const currentUser = IdentityLogic.getIdentity();
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                let total = 0;
+                let yours = 0;
+
+                for (const name of sheets) {
+                    const sheet = context.workbook.worksheets.getItemOrNullObject(name);
+                    const footerRange = sheet.getRange("A:A").find("DO NOT DELETE", { completeMatch: false, matchCase: false });
+                    footerRange.load(["rowIndex", "isNullObject"]);
+                    sheet.load("isNullObject");
+                    await context.sync();
+
+                    if (sheet.isNullObject || footerRange.isNullObject) continue;
+
+                    const rowCount = footerRange.rowIndex - 7;
+                    if (rowCount <= 0) continue;
+
+                    const range = sheet.getRangeByIndexes(7, 0, rowCount, 8);
+                    range.load("text");
+                    await context.sync();
+
+                    range.text.forEach(row => {
+                        const idNum = parseFloat(row[0]);
+                        if (!isNaN(idNum) && !Number.isInteger(idNum)) {
+                            const taskEnd = new Date(row[5]);
+                            if (row[5] !== "TBD" && !isNaN(taskEnd) && taskEnd < today && row[7] !== "100%") {
+                                total++;
+                                if (row[2] === currentUser) yours++;
+                            }
+                        }
+                    });
+                }
+                setOverdueCount(total);
+                setUserOverdueCount(yours);
+                return { total, yours };
+            });
+        } catch (e) { console.warn("Overdue fetch failed", e); return { total: 0, yours: 0 }; }
     };
 
     const fetchUnseenCount = async (clearFirst = false) => {
@@ -423,8 +471,24 @@ function App() {
                 if (!user) {
                     setShowIdentityModal(true);
                 } else {
-                    // SUCCESS: Show Toast
-                    showToast("Welcome Back!", `Good to see you, ${user}.`);
+                    // Enhanced Welcome Toast with Overdue Logic
+                    fetchOverdueData().then(counts => {
+                        toast.custom((t) => (
+                            <div className={`${t.visible ? 'animate-enter' : 'animate-leave'} bg-white shadow-lg rounded-lg pointer-events-auto d-flex border border-primary`} style={{ minWidth: '350px', cursor: 'pointer' }} onClick={() => { setActiveTab("OverdueTasks"); toast.dismiss(t.id); }}>
+                                <div className="flex-grow-1 p-3">
+                                    <div className="d-flex align-items-start">
+                                        <div className="ms-3">
+                                            <p className="text-sm font-bold text-dark mb-1" style={{ fontSize: '0.9rem' }}>Good to see you, {user}!</p>
+                                            <p className="text-sm text-muted mb-0" style={{ fontSize: '0.85rem' }}>
+                                                There are {counts.total} overdue tasks, {counts.yours} are yours. <br/>
+                                                <span className="text-primary fw-bold" style={{ textDecoration: 'underline' }}>Click here to view these.</span>
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        ), { duration: 10000 });
+                    });
                 }
             }
         });
@@ -541,9 +605,15 @@ function App() {
                     setActiveTab={setActiveTab} 
                     isFileValid={isValidFile} 
                     unseenCount={unseenCount}
+                    overdueCount={overdueCount}
                     fileType={fileType}
                     onAddTimecard={() => setShowCreateTimecardModal(true)}
                     onUpdatesViewed={() => setUnseenCount(0)}
+                    onClearHighlight={() => setHighlightId(null)}
+                    onNavReset={() => {
+                        setHighlightId(null);
+                        setNavResetTrigger(prev => prev + 1);
+                    }}
                 />
             </div>
 
@@ -562,13 +632,37 @@ function App() {
                 ) : (
                     <>
                             {activeTab === "Home" && <HomePage setActiveTab={setActiveTab} />}
-                        {activeTab === "HoustonList" && <ProjectList sheetName="Houston" refreshTrigger={refreshTrigger} highlightId={highlightId} />}
-                        {activeTab === "DallasList" && <ProjectList sheetName="Dallas" refreshTrigger={refreshTrigger} highlightId={highlightId} />}
+                        {activeTab === "HoustonList" && (
+                            <ProjectList 
+                                key={`Houston-${navResetTrigger}`}
+                                sheetName="Houston" 
+                                refreshTrigger={refreshTrigger} 
+                                highlightId={highlightId} 
+                                onClearHighlight={() => setHighlightId(null)} 
+                            />
+                        )}
+                        {activeTab === "DallasList" && (
+                            <ProjectList 
+                                key={`Dallas-${navResetTrigger}`}
+                                sheetName="Dallas" 
+                                refreshTrigger={refreshTrigger} 
+                                highlightId={highlightId} 
+                                onClearHighlight={() => setHighlightId(null)} 
+                            />
+                        )}
                         {activeTab === "AddProject" && <CreateProject onProjectCreated={handleProjectCreated} />}
                         {activeTab === "PTOManager" && <PTOManager refreshTrigger={refreshTrigger} onNavigateToAdd={() => setActiveTab("AddPTO")} />}
                         {activeTab === "SubContractorManager" && <SubContractorManager refreshTrigger={refreshTrigger} />}
                         {activeTab === "TeamManager" && <TeamManager refreshTrigger={refreshTrigger} />}
                         {activeTab === "AddPTO" && <CreatePTO onPTOCreated={triggerRefresh} />}
+                        {activeTab === "OverdueTasks" && (
+                            <OverdueTasks 
+                                onNavigate={(loc, taskId) => {
+                                    setHighlightId(taskId);
+                                    setNavResetTrigger(prev => prev + 1);
+                                    setActiveTab(loc === "Houston" ? "HoustonList" : "DallasList");
+                                }} 
+                            />)}
                         {activeTab === "TimecardDashboard" && <TimecardView currentFileName={currentName} refreshTrigger={refreshTrigger} />}
                         {activeTab === "PmTimelogDashboard" && (
                             <div className="text-center mt-5">

@@ -1,5 +1,5 @@
 /* global React, ReactBootstrap, Excel */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { GanttLogic } from '../utils/ganttLogic';
 import { ChangelogLogic } from '../utils/changelogLogic';
 import { IdentityLogic } from '../utils/identityLogic';
@@ -9,7 +9,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faArrowLeft, faFolderPlus, faClipboardList, faLocationArrow, faPlus, faPencil, faTrash, faUser, faCalendarDays, faArrowRight, faSortAmountDown, faSortAmountUp, faSliders } from '@fortawesome/free-solid-svg-icons';
 import { Button, Card, Badge, Spinner, Modal, ButtonGroup, Form, Row, Col, Alert, Collapse } from 'react-bootstrap';
 
-const ProjectTasks = ({ project, onBack }) => {
+const ProjectTasks = ({ project, onBack, highlightId }) => {
     const [tasks, setTasks] = useState([]);
     const [teamMembers, setTeamMembers] = useState([]); // Stores { first, full }
     const [isLoading, setIsLoading] = useState(false);
@@ -24,6 +24,9 @@ const ProjectTasks = ({ project, onBack }) => {
     const [filters, setFilters] = useState({ lead: "", percent: "" });
     const [sortConfig, setSortConfig] = useState({ key: "id", direction: "asc" });
     const [showControls, setShowControls] = useState(false);
+
+    // Refs for scrolling to highlighted task
+    const taskRefs = useRef({});
 
     // --- 1. INITIAL LOADING ---
     useEffect(() => {
@@ -116,6 +119,16 @@ const ProjectTasks = ({ project, onBack }) => {
     useEffect(() => {
         fetchTasks();
     }, [project]);
+
+    // --- 2. SCROLL TO HIGHLIGHTED TASK ---
+    useEffect(() => {
+        if (highlightId && tasks.length > 0 && taskRefs.current[highlightId]) {
+            // Small delay to ensure the DOM is ready
+            setTimeout(() => {
+                taskRefs.current[highlightId].scrollIntoView({ behavior: "smooth", block: "center" });
+            }, 500);
+        }
+    }, [highlightId, tasks]);
 
     // --- 2. ACTIONS ---
     const openAddModal = () => {
@@ -349,6 +362,8 @@ const ProjectTasks = ({ project, onBack }) => {
 
     const processedTasks = getProcessedTasks();
 
+    // console.log(project);
+
     return (
         <div className="mt-4">
             {/* HEADER */}
@@ -358,19 +373,35 @@ const ProjectTasks = ({ project, onBack }) => {
                         <FontAwesomeIcon icon={faArrowLeft} />
                     </Button>
                     <div style={{lineHeight: "1.1"}}>
-                        <h6 className="m-0 fw-bold text-primary">{project.projectNumber ? `[${project.projectNumber}] ` : ""}{project.name}</h6>
-                        <small className="text-muted" style={{fontSize: "0.7rem"}}>Project {project.id} Task Manager</small> {/* Project ID is already a string */}
+                        <h6 className="m-0 fw-bold text-primary">{project.name}</h6>
+                        <Row>
+                            <Col xs='auto'>
+                                <small className="text-muted" style={{fontSize: "0.7rem", fontStyle: !project.projectNumber ? "italic" : ""}}>Project #: {project.projectNumber ? `${project.projectNumber}` : `No current Barbizon Project ID, #${project.id} in Gantt.`}</small> {/* Project ID is already a string */}
+                            </Col>
+                        </Row>
+                        <Row>
+                            <Col xs='auto'>
+                                <small className="text-muted" style={{fontSize: "0.7rem"}}>Project Manager: {project.lead}</small>
+                            </Col>
+                        </Row>
                     </div>
                 </div>
-                <div className="d-flex align-items-center">
+            </div>
+            <Row className="d-flex align-items-center justify-content-end mb-3 pb-3 border-bottom">
+                <Col>
+                    <h6 className="fw-bold">Project Tasks:</h6>
+                </Col>
+                <Col xs="auto">
                     <Button variant="link" size="sm" className="text-muted me-2 p-0" onClick={() => setShowControls(!showControls)} title="Sort & Filter">
                         <FontAwesomeIcon icon={faSliders} className={showControls ? "text-primary" : ""} />
                     </Button>
+                </Col>
+                <Col xs="auto">
                     <Button variant="primary" size="sm" onClick={openAddModal}>
                         <FontAwesomeIcon icon={faPlus} className="me-1" /> Add Task
                     </Button>
-                </div>
-            </div>
+                </Col>
+            </Row>
 
             {/* CONTROLS: FILTER & SORT */}
             <Collapse in={showControls}>
@@ -433,8 +464,26 @@ const ProjectTasks = ({ project, onBack }) => {
                 </div>
             ) : (
                 <div style={{ maxHeight: "calc(100vh - 220px)", overflowY: "auto", paddingRight: "4px" }}>
-                    {processedTasks.map((t, idx) => (
-                        <Card key={idx} className="mb-2 shadow-sm border-0" style={{ marginLeft: `${t.depth * 24}px`, borderLeft: t.depth > 0 ? "3px solid #e9ecef" : "none" }}>
+                    {processedTasks.map((t, idx) => {
+                        const isHighlighted = highlightId === t.id;
+                        return (
+                            <React.Fragment key={`${idx}-${isHighlighted}`}>
+                                {isHighlighted && (
+                                    <style>{`
+                                        @keyframes taskFlash {
+                                            0% { background-color: #adb5bd; }
+                                            100% { background-color: #f0f7ff; }
+                                        }
+                                        .task-highlight-flash {
+                                            animation: taskFlash 3s ease-out forwards !important;
+                                        }
+                                    `}</style>
+                                )}
+                                <Card 
+                                    ref={el => (taskRefs.current[t.id] = el)}
+                                    className={`mb-2 shadow-sm border-0 ${isHighlighted ? 'border border-primary task-highlight-flash' : ''}`} 
+                                    style={{ marginLeft: `${t.depth * 24}px`, borderLeft: t.depth > 0 ? "3px solid #e9ecef" : "none", backgroundColor: isHighlighted ? '#f0f7ff' : 'white' }}
+                                >
                             <Card.Body className="p-2">
                                 {/* TOP ROW: ID, NAME, BUTTONS */}
                                 <div className="d-flex justify-content-between align-items-start">
@@ -496,7 +545,9 @@ const ProjectTasks = ({ project, onBack }) => {
                                 </div>
                             </Card.Body>
                         </Card>
-                    ))}
+                            </React.Fragment>
+                        );
+                    })}
                 </div>
             )}
 

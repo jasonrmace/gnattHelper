@@ -6,7 +6,7 @@ import { Button, Card, Badge, Spinner, Row, Col, Form, Collapse } from 'react-bo
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faLocationArrow, faListCheck, faChevronRight, faUser, faCalendarDays, faArrowRight, faSyncAlt, faSortAmountDown, faSortAmountUp, faSliders } from '@fortawesome/free-solid-svg-icons';
 
-const ProjectList = ({ sheetName = "Houston", refreshTrigger, highlightId }) => {
+const ProjectList = ({ sheetName = "Houston", refreshTrigger, highlightId, onClearHighlight }) => {
     // --- STATE ---
     const [projects, setProjects] = useState([]);
     const [teamMembers, setTeamMembers] = useState([]);
@@ -176,6 +176,21 @@ const ProjectList = ({ sheetName = "Houston", refreshTrigger, highlightId }) => 
 
     useEffect(() => { fetchProjects(); }, [refreshTrigger]);
 
+    // --- 4. AUTO-SELECT PROJECT FROM TASK HIGHLIGHT ---
+    useEffect(() => {
+        if (highlightId && projects.length > 0 && !selectedProject) {
+            const idNum = parseFloat(highlightId);
+            // If it's a task (has decimal), find and select the parent project
+            if (!Number.isInteger(idNum)) {
+                const parentId = Math.floor(idNum).toString();
+                const parentProj = projects.find(p => String(p.id) === parentId);
+                if (parentProj) {
+                    setSelectedProject(parentProj);
+                }
+            }
+        }
+    }, [highlightId, projects, selectedProject]);
+
     // --- 4. FILTER & SORT LOGIC ---
     const getProcessedProjects = () => {
         let filtered = projects.filter(p => {
@@ -216,7 +231,11 @@ const ProjectList = ({ sheetName = "Houston", refreshTrigger, highlightId }) => 
         return (
             <ProjectTasks 
                 project={selectedProject} 
-                onBack={() => setSelectedProject(null)} 
+                onBack={() => {
+                    setSelectedProject(null);
+                    if (onClearHighlight) onClearHighlight();
+                }} 
+                highlightId={highlightId}
             />
         );
     }
@@ -301,12 +320,23 @@ const ProjectList = ({ sheetName = "Houston", refreshTrigger, highlightId }) => 
                 {processedProjects.map((p, index) => {
                     const isNew = highlightId && String(p.id) === String(highlightId);
                     return (
-                        <Card 
-                            key={index} 
-                            ref={el => (projectRefs.current[p.id] = el)}
-                            className={`mb-2 shadow-sm border-0 ${isNew ? 'border border-primary' : ''}`}
-                            style={isNew ? { backgroundColor: '#f0f7ff' } : {}}
-                        >
+                        <div key={`${index}-${isNew}`}>
+                            {isNew && (
+                                <style>{`
+                                    @keyframes projectFlash {
+                                        0% { background-color: #adb5bd; }
+                                        100% { background-color: #f0f7ff; }
+                                    }
+                                    .project-highlight-flash {
+                                        animation: projectFlash 3s ease-out forwards !important;
+                                    }
+                                `}</style>
+                            )}
+                            <Card 
+                                ref={el => (projectRefs.current[p.id] = el)}
+                                className={`mb-2 shadow-sm border-0 ${isNew ? 'border border-primary project-highlight-flash' : ''}`}
+                                style={isNew ? { backgroundColor: '#f0f7ff' } : {}}
+                            >
                             <Card.Body className="py-2">
                                 <Row>
                                     <Col xs="auto" className="">
@@ -372,6 +402,7 @@ const ProjectList = ({ sheetName = "Houston", refreshTrigger, highlightId }) => 
                             </div>
                         </Card.Body>
                     </Card>
+                        </div>
                     );
                 })}
             </div>
