@@ -48,7 +48,17 @@ const LoadingOverlay = ({ isVisible, message }) => {
             <div className="mb-4" aria-label="Loading" style={{
                 backgroundColor: 'rgba(9, 13, 22, 0.9)',
             }}>
-                <BarbizonSpinner size={100} speed="1.2s" message={<div className="text-center">{message} <p className="small" style={{color: '#FFFFFF'}}>Please wait while Excel updates...</p></div>} />
+                <BarbizonSpinner 
+                    size={100} 
+                    speed="1.2s" 
+                    message={
+                        <span className="text-center d-block">
+                            {message} 
+                            <br/>
+                            <span className="small" style={{color: '#FFFFFF', opacity: 0.8}}>Please wait while Excel updates...</span>
+                        </span>
+                    } 
+                />
             </div>
         </div>
     );
@@ -56,7 +66,7 @@ const LoadingOverlay = ({ isVisible, message }) => {
 
 function App() {
     // --- STATE ---
-    const [version] = useState("v6.1.2"); 
+    const [version] = useState("v6.1.3"); 
     const [activeTab, setActiveTab] = useState("Home");
     const [isValidFile, setIsValidFile] = useState(false);
     const [currentName, setCurrentName] = useState("");

@@ -1,6 +1,6 @@
 {
   "name": "gnatthelper",
-  "version": "6.1.2",
+  "version": "6.1.3",
   "description": "Helper functions for Barbizon Gnatt in Excel",
   "type": "module",
   "homepage": "https://jasonrmace.github.io/gnattHelper/",

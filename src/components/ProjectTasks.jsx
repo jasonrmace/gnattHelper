@@ -159,7 +159,16 @@ const ProjectTasks = ({ project, onBack }) => {
             setStatus("Task Name is required.");
             return;
         }
-        setStatus("Processing...");
+        
+        setStatus(""); // Clear any previous status messages
+        let loaderMessage = "";
+        if (formMode === "edit") {
+            loaderMessage = `Editing Task Row ${activeTask.rowIndex + 1} in ${project.location}...`;
+        } else {
+            loaderMessage = `Adding Task in ${project.location}...`;
+        }
+
+        if (window.GlobalLoader) window.GlobalLoader.show(loaderMessage);
 
         try {
             await Excel.run(async (context) => {
@@ -179,8 +188,9 @@ const ProjectTasks = ({ project, onBack }) => {
                     }
                     sheet.getCell(rowIndex, 7).values = [[formData.percent]];
 
+                    await ChangelogLogic.logChange(context, `Edited Task: "${formData.name}" (ID: ${activeTask.id}) in Project ${project.id}`);
+
                     // Surgical row update (Using 200 as a safe column count to cover EI and beyond)
-                    await FormattingLogic.applyRulesToRange(context, project.location, rowIndex, 1, 200);
                 } else {
                     // ADD NEW TASK LOGIC
                     let templateName = "Level2Task";
@@ -230,27 +240,35 @@ const ProjectTasks = ({ project, onBack }) => {
                         sheet.getCell(insertRowIndex, 6).values = [[diff]];
                     }
                     
-                    // Surgical row update for the new row
-                    await FormattingLogic.applyRulesToRange(context, project.location, insertRowIndex, 1, 200);
                     newRow.select();
                 }
 
                 // --- TRIGGER LOGIC ENGINE ---
                 await GanttLogic.updateProjectAverages(context, project.location);
                 await context.sync();
-                
-                setShowForm(false);
-                fetchTasks();
             });
+            
+            // Close the modal state immediately after Excel transactions are complete,
+            // but let the event listener handle the GlobalLoader.hide() after formatting.
+            setShowForm(false);
+            await fetchTasks(); // Wait for the sidebar list to refresh from Excel
         } catch (err) {
             console.error(err);
             setStatus("Error: " + err.message);
+        } finally {
+            setIsLoading(false);
+            // Note: GlobalLoader.hide() is handled by the EventListener watchdog
         }
     };
 
     // --- 4. DELETE LOGIC (WITH GANTT LOGIC TRIGGER) ---
     const handleDelete = async () => {
         if (!activeTask) return;
+
+        if (window.GlobalLoader) {
+            window.GlobalLoader.show(`Deleting Task Row ${activeTask.rowIndex + 1} from ${project.location}...`);
+        }
+
         try {
             await Excel.run(async (context) => {
                 const sheet = context.workbook.worksheets.getItem(project.location);
@@ -261,13 +279,16 @@ const ProjectTasks = ({ project, onBack }) => {
                 // --- TRIGGER LOGIC ENGINE ---
                 await GanttLogic.updateProjectAverages(context, project.location);
                 await context.sync();
-                
-                setShowDelete(false);
-                setActiveTask(null);
-                fetchTasks();
             });
+
+            // Close the modal state immediately after Excel transactions are complete,
+            // but let the event listener handle the GlobalLoader.hide() after formatting.
+            setShowDelete(false);
+            setActiveTask(null);
+            await fetchTasks();
         } catch (error) {
             console.error(error);
+        } finally {
         }
     };
 

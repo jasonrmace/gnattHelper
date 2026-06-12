@@ -66,7 +66,9 @@ const CreateProject = ({ onProjectCreated }) => {
         }
 
         setIsLoading(true);
-        setStatus({ msg: "Processing...", variant: "primary" });
+        if (window.GlobalLoader) {
+            window.GlobalLoader.show(`Adding Project "${formData.name}" to ${formData.location}...`);
+        }
 
         let createdId = null;
         try {
@@ -177,7 +179,6 @@ const CreateProject = ({ onProjectCreated }) => {
                 // H. TRIGGER LOGIC ENGINES (Phase 2 Integration)
                 // Ensures internal formulas are correct immediately
                 await FormattingLogic.applyRulesToRange(context, formData.location, insertRowIndex, 1, 200);
-                await GanttLogic.updateProjectAverages(context, formData.location);
 
                 // Record the change
                 await ChangelogLogic.logChange(context, `Created Project: ${formData.name} (ID: ${newId})`);
@@ -187,10 +188,12 @@ const CreateProject = ({ onProjectCreated }) => {
                 newRow.select();
                 await context.sync();
 
+                // GanttLogic.updateProjectAverages will be called by the event listener
+                // after the sheet change is detected and debounced.
                 setStatus({ msg: `Project "${formData.name}" (ID: ${newId}) Created!`, variant: "success" });
                 setFormData({ ...formData, name: "", lead: "", startDate: "", endDate: "", projectNumber: "", isServiceCall: false });
             });
-
+            
             // Trigger refresh AFTER the Excel.run transaction is fully complete
             if (onProjectCreated) {
                 onProjectCreated(createdId, formData.location);
@@ -199,7 +202,8 @@ const CreateProject = ({ onProjectCreated }) => {
             console.error(error);
             setStatus({ msg: error.message, variant: "danger" });
         } finally {
-            setIsLoading(false);
+            setIsLoading(false); // This hides the local spinner in the button
+            // GlobalLoader will be hidden by the event listener after formatting is complete.
             setTimeout(() => setStatus({ msg: "", variant: "light" }), 4000);
         }
     };

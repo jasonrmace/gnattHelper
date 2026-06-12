@@ -170,8 +170,8 @@ export const FormattingLogic = {
             if (rowCount <= 0) return;
 
             // Surgical cleanup for the targeted row(s)
-            gridRange.unmerge();
-            namesRange.unmerge();
+            gridRange.unmerge(); // Unmerging can be destructive if not careful
+            namesRange.unmerge(); // Unmerging can be destructive if not careful
             gridRange.format.fill.clear();
             namesRange.format.fill.clear();
             

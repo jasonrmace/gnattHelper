@@ -75,7 +75,10 @@ export const EventListeners = {
 };
 
 // --- HANDLER 1: GANTT CHANGES (Lightweight) ---
-// Only notifies about remote updates; does NOT run logic engines.
+// Handles remote updates (badge/loader for co-author formatting) AND local changes (triggers logic engines).
+let ganttDebounceTimer = null; // New debounce timer for Gantt changes
+let isProcessingGantt = false; // Flag to prevent recursive event loops
+
 async function handleGanttChange(event) {
     if (event.source === Excel.EventSource.remote) {
         if (window.RefreshBadge) window.RefreshBadge();
@@ -95,6 +98,76 @@ async function handleGanttChange(event) {
                 }
             }
         });
+    } else if (event.source === Excel.EventSource.local) {
+        // If the add-in is already processing a change, ignore events 
+        // triggered by our own writes to prevent an infinite loop.
+        if (isProcessingGantt) return;
+
+        // Handle local changes to Gantt sheets
+        // Debounce: Wait 1.5 seconds after the last keystroke before running
+        if (ganttDebounceTimer) clearTimeout(ganttDebounceTimer);
+
+        ganttDebounceTimer = setTimeout(async () => {
+            let message = "Updating Gantt chart...";
+            let sheetName = "";
+            let rowNumber = "";
+
+            try {
+                await Excel.run(async (context) => {
+                    const sheet = context.workbook.worksheets.getItem(event.worksheetId);
+                    sheet.load("name");
+                    await context.sync();
+                    sheetName = sheet.name;
+
+                    // Extract row number from address (e.g., "Sheet1!A1:C3" -> 1)
+                    // This is a best-effort attempt; event.address might be complex.
+                    const addressParts = event.address.split('!');
+                    const rangePart = addressParts.length > 1 ? addressParts[1] : addressParts[0];
+                    const rowMatch = rangePart.match(/\d+/);
+                    if (rowMatch) {
+                        rowNumber = rowMatch[0];
+                    }
+
+                    if (event.changeType === "CellChanged" || event.changeType === "RangeEdited") {
+                        message = `Editing Task Row ${rowNumber} in ${sheetName}...`;
+                    } else if (event.changeType === "RowInserted") {
+                        message = `Adding Task Row(s) in ${sheetName}...`;
+                    } else if (event.changeType === "RowDeleted") { // This will still trigger a full refresh
+                        message = `Deleting Task Row(s) in ${sheetName}...`;
+                    } else {
+                        message = `Updating ${sheetName} sheet...`;
+                    }
+                    
+                    if (window.GlobalLoader) window.GlobalLoader.show(message);
+
+                    isProcessingGantt = true; // Block incoming events
+                    console.log("🔄 Syncing Grid...");
+
+                    // STEP 1: Formatting
+                    if ((event.changeType === "CellChanged" || event.changeType === "RangeEdited") && rowNumber) {
+                        console.log(`>> Running Surgical Formatting for ${sheetName} Row ${rowNumber}...`);
+                        const metadata = await FormattingLogic.fetchFormattingMetadata(context);
+                        // Apply rules only to the modified row (index is 0-based, so rowNumber - 1)
+                        await FormattingLogic.applyRulesToRange(context, sheetName, parseInt(rowNumber) - 1, 1, 150, metadata);
+                    } else {
+                        console.log(`>> Running Full Formatting Logic for ${sheetName} due to structural change...`);
+                        await FormattingLogic.generateSmartRules(context, sheetName);
+                    }
+
+                    // STEP 2: Visuals (Overlays - Counters/Popups)
+                    // Only run for additions as requested; edits and deletes handle their own row logic.
+                    if (event.changeType === "RowInserted") {
+                        console.log(`>> Running Visual Logic for ${sheetName} due to row addition...`);
+                        await VisualLogic.refreshGridAlerts(context, sheetName);
+                    }
+                });
+            } catch (error) {
+                console.error("Error processing local Gantt change:", error);
+            } finally {
+                isProcessingGantt = false; // Allow events again
+                if (window.GlobalLoader) window.GlobalLoader.hide();
+            }
+        }, 1500); // 1.5 second delay
     }
 }
 
@@ -115,21 +188,30 @@ async function handleMetadataChange(event) {
     if (debounceTimer) clearTimeout(debounceTimer);
 
     debounceTimer = setTimeout(async () => {
-        console.log("🔄 Change detected. Syncing Grid...");
+        try {
+            console.log("🔄 Change detected. Syncing Grid...");
+            // Show a generic loader message for metadata changes,
+            // which will be updated by FormattingLogic's more specific messages.
+            if (window.GlobalLoader) window.GlobalLoader.show("Processing metadata changes...");
 
-        await Excel.run(async (context) => {
-            // STEP 1: Formatting (Heavy Lifting - Bars/Colors)
-            console.log(">> Running Formatting Logic...");
-            for (const name of GANTT_SHEETS) {
-                await FormattingLogic.generateSmartRules(context, name);
-            }
+            await Excel.run(async (context) => {
+                // STEP 1: Formatting (Heavy Lifting - Bars/Colors)
+                console.log(">> Running Formatting Logic...");
+                for (const name of GANTT_SHEETS) {
+                    await FormattingLogic.generateSmartRules(context, name);
+                }
 
-            // STEP 2: Visuals (Overlays - Counters/Popups)
-            // Must run AFTER formatting because formatting clears the grid
-            console.log(">> Running Visual Logic...");
-            for (const name of GANTT_SHEETS) {
-                await VisualLogic.refreshGridAlerts(context, name);
-            }
-        });
+                // STEP 2: Visuals (Overlays - Counters/Popups)
+                // Must run AFTER formatting because formatting clears the grid
+                console.log(">> Running Visual Logic...");
+                for (const name of GANTT_SHEETS) {
+                    await VisualLogic.refreshGridAlerts(context, name);
+                }
+            });
+        } catch (error) {
+            console.error("Error during metadata change processing:", error);
+        } finally {
+            if (window.GlobalLoader) window.GlobalLoader.hide();
+        }
     }, 1500); // 1.5 second delay
 }
