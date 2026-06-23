@@ -47,7 +47,15 @@ const CreateProject = ({ onProjectCreated }) => {
 
     // --- 2. HANDLE INPUT CHANGES ---
     const handleChange = (field, value) => {
-        setFormData(prev => ({ ...prev, [field]: value }));
+        setFormData(prev => {
+            const nextData = { ...prev, [field]: value };
+            if (field === "startDate" && value) {
+                if (!prev.endDate || prev.endDate < value) {
+                    nextData.endDate = value;
+                }
+            }
+            return nextData;
+        });
     };
 
     // --- 3. CREATE LOGIC ---

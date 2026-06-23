@@ -35,7 +35,15 @@ const CreatePTO = ({ onPTOCreated }) => {
     }, []);
 
     const handleChange = (field, value) => {
-        setFormData(prev => ({ ...prev, [field]: value }));
+        setFormData(prev => {
+            const nextData = { ...prev, [field]: value };
+            if (field === "startDate" && value) {
+                if (!prev.endDate || prev.endDate < value) {
+                    nextData.endDate = value;
+                }
+            }
+            return nextData;
+        });
     };
 
     const handleCreate = async () => {

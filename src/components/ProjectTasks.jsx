@@ -582,7 +582,21 @@ const ProjectTasks = ({ project, onBack, highlightId }) => {
                         <Col xs={6}>
                             <Form.Group>
                                 <Form.Label className="small fw-bold text-muted">START</Form.Label>
-                                <Form.Control size="sm" type="date" value={formData.start} onChange={(e) => setFormData({...formData, start: e.target.value})} />
+                                <Form.Control 
+                                    size="sm" 
+                                    type="date" 
+                                    value={formData.start} 
+                                    onChange={(e) => {
+                                        const newStart = e.target.value;
+                                        setFormData(prev => {
+                                            const nextData = { ...prev, start: newStart };
+                                            if (newStart && (!prev.end || prev.end < newStart)) {
+                                                nextData.end = newStart;
+                                            }
+                                            return nextData;
+                                        });
+                                    }} 
+                                />
                             </Form.Group>
                         </Col>
                         <Col xs={6}>

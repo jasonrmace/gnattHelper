@@ -296,6 +296,7 @@ const MainNavbar = ({ activeTab, setActiveTab, isFileValid, unseenCount, overdue
                                         Overdue Tasks
                                         {overdueCount > 0 && <Badge bg="danger" pill className="ms-2" style={{fontSize: '0.65rem'}}>{overdueCount}</Badge>}
                                     </Nav.Link>
+                                    <Nav.Link eventKey="Tasks">Tasks</Nav.Link>
                                     <Nav.Link eventKey="SubContractorManager">Sub Contractors</Nav.Link>
 
                                     <NavDropdown title="PTO/Vacation" id="pto-nav-dropdown">

@@ -26,6 +26,7 @@ import TimecardView from './components/TimecardView';
 import CreateTimecardModal from './components/CreateTimecardModal';
 import BarbizonSpinner from './components/BarbizonSpinner';
 import OverdueTasks from './components/OverdueTasks';
+import TasksPage from './components/TasksPage';
 
 // 1. CONFIGURATION
 const GANTT_FILENAMES = ["Barbizon Texas Project Management.xlsx"];
@@ -67,7 +68,7 @@ const LoadingOverlay = ({ isVisible, message }) => {
 
 function App() {
     // --- STATE ---
-    const [version] = useState("v6.2.0"); 
+    const [version] = useState("v6.3.0"); 
     const [activeTab, setActiveTab] = useState("Home");
     const [isValidFile, setIsValidFile] = useState(false);
     const [currentName, setCurrentName] = useState("");
@@ -663,6 +664,11 @@ function App() {
                                     setActiveTab(loc === "Houston" ? "HoustonList" : "DallasList");
                                 }} 
                             />)}
+                        {activeTab === "Tasks" && (
+                            <TasksPage 
+                                refreshTrigger={refreshTrigger}
+                            />
+                        )}
                         {activeTab === "TimecardDashboard" && <TimecardView currentFileName={currentName} refreshTrigger={refreshTrigger} />}
                         {activeTab === "PmTimelogDashboard" && (
                             <div className="text-center mt-5">
