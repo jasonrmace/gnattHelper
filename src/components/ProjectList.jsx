@@ -4,7 +4,7 @@ import ProjectTasks from './ProjectTasks';
 import React, { useState, useEffect, useRef } from 'react';
 import { Button, Card, Badge, Spinner, Row, Col, Form, Collapse } from 'react-bootstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faLocationArrow, faListCheck, faChevronRight, faUser, faCalendarDays, faArrowRight, faSyncAlt, faSortAmountDown, faSortAmountUp, faSliders } from '@fortawesome/free-solid-svg-icons';
+import { faLocationArrow, faListCheck, faChevronRight, faUser, faCalendarDays, faArrowRight, faSyncAlt, faSortAmountDown, faSortAmountUp, faSliders, faArrowUpRightFromSquare } from '@fortawesome/free-solid-svg-icons';
 
 const ProjectList = ({ sheetName = "Houston", refreshTrigger, highlightId, onClearHighlight }) => {
     // --- STATE ---
@@ -123,12 +123,21 @@ const ProjectList = ({ sheetName = "Houston", refreshTrigger, highlightId, onCle
                 projNumHeader.load(["columnIndex", "isNullObject"]);
                 await context.sync();
 
+                const etcProjNumHeader = headerRow.find("ETC Project #", { completeMatch: true, matchCase: false });
+                etcProjNumHeader.load(["columnIndex", "isNullObject"]);
+                await context.sync();
+
                 let projNumIdx = 3; // Fallback to index 3 (Col D)
                 if (!projNumHeader.isNullObject) {
                     projNumIdx = projNumHeader.columnIndex;
                 }
 
-                const colCountToFetch = Math.max(8, projNumIdx + 1);
+                let etcProjNumIdx = 3; // Fallback to index 3 (Col D)
+                if (!etcProjNumHeader.isNullObject) {
+                    etcProjNumIdx = etcProjNumHeader.columnIndex;
+                }
+
+                const colCountToFetch = Math.max(8, etcProjNumIdx + 1);
                 const dataRange = sheet.getRangeByIndexes(dataStartIndex, 0, rowCount, colCountToFetch);
                 dataRange.load("text"); 
                 await context.sync();
@@ -146,6 +155,7 @@ const ProjectList = ({ sheetName = "Houston", refreshTrigger, highlightId, onCle
                         // IT IS A PROJECT
                         const rawLead = row[2]?.trim() || "";
                         const fullLeadName = teamMap[rawLead.toLowerCase()] || rawLead;
+                        // console.log(projectsMap);
                         projectsMap.set(id, {
                             location: sheetName,
                             id: row[0], // Keep as string/raw to avoid float issues
@@ -157,7 +167,8 @@ const ProjectList = ({ sheetName = "Houston", refreshTrigger, highlightId, onCle
                             end: row[5],
                             percent: row[7],
                             totalTasks: 0,
-                            completedTasks: 0
+                            completedTasks: 0,
+                            etcProjectNum: row[etcProjNumIdx]
                         });
                     } else if (!isNaN(id) && !Number.isInteger(id)) {
                         // IT IS A TASK
@@ -319,6 +330,7 @@ const ProjectList = ({ sheetName = "Houston", refreshTrigger, highlightId, onCle
             >
                 {processedProjects.map((p, index) => {
                     const isNew = highlightId && String(p.id) === String(highlightId);
+                    const etcLink = "https://my.etcconnect.com/order/" + p.etcProjectNum + "/line-items";
                     return (
                         <div key={`${index}-${isNew}`}>
                             {isNew && (
@@ -348,10 +360,13 @@ const ProjectList = ({ sheetName = "Houston", refreshTrigger, highlightId, onCle
                                     </Col>
                                 </Row>
                                 <Row>
-                                    <Col>
+                                    <Col xs="auto">
                                         {p.projectNumber && <Badge bg="info" className="text-dark" style={{fontSize: "0.65rem"}} title="Project Number">{p.projectNumber}</Badge>}
                                     </Col>
                                     <Col xs="auto">
+                                        {p.etcProjectNum && <Badge style={{fontSize: "0.65rem"}} title="ETC Project Number"><a href={etcLink} style={{color: "inherit"}}>ETC: {p.etcProjectNum} <FontAwesomeIcon icon={faArrowUpRightFromSquare} /></a></Badge>}
+                                    </Col>
+                                    <Col xs="auto" className="ms-auto">
                                         <Badge bg={p.percent === "100%" ? "success" : p.percent === "0%" ? "danger" : "warning"} pill className="me-2" style={{minWidth: "45px"}} title="Percent Complete">
                                             {p.percent || "0%"}
                                         </Badge>

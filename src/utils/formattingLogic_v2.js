@@ -82,14 +82,18 @@ export const FormattingLogic = {
         } catch (error) {
             console.error("Formatting Logic Error:", error);
         } finally {
-            // SIGNAL END: Clear the global flag
-            await Excel.run(async (ctx) => {
-                const statusRange = ctx.workbook.names.getItemOrNullObject("GlobalFormattingStatus").getRangeOrNullObject();
+            // SIGNAL END: Safely clear the global flag using the existing context
+            try {
+                const statusRange = context.workbook.names.getItemOrNullObject("GlobalFormattingStatus").getRangeOrNullObject();
                 statusRange.load("isNullObject");
-                await ctx.sync();
-                if (!statusRange.isNullObject) statusRange.values = [["IDLE"]];
-                await ctx.sync();
-            }).catch(() => {});
+                await context.sync();
+                if (!statusRange.isNullObject) {
+                    statusRange.values = [["IDLE"]];
+                    await context.sync();
+                }
+            } catch (finalErr) {
+                console.error("Failed to clear global status flag:", finalErr);
+            }
 
             if (window.GlobalLoader) window.GlobalLoader.hide();
         }
@@ -109,6 +113,9 @@ export const FormattingLogic = {
         rngWho.load(["values", "isNullObject"]);
         rngStart.load(["values", "isNullObject"]);
         rngDays.load(["values", "isNullObject"]);
+
+        // Sync first to verify if the Team sheet actually exists
+        await context.sync();
         
         let officeMap = {};
         let teamRules = [];
@@ -160,6 +167,11 @@ export const FormattingLogic = {
      */
     applyRulesToRange: async (context, sheetName, startRow, rowCount, colCount, metadata = null) => {
         try {
+            // console.log(`Formatting Target -> Row: ${startRow + 1}, RowCount: ${rowCount}, ColCount: ${colCount}`);
+            if (rowCount <= 0 || colCount <= 0 || startRow < 0) {
+                console.warn(`applyRulesToRange: Skipping execution due to invalid bounds. Rows: ${rowCount}, Cols: ${colCount}`);
+                return;
+            }
             const sheet = context.workbook.worksheets.getItem(sheetName);
             if (!metadata) metadata = await FormattingLogic.fetchFormattingMetadata(context);
 
@@ -184,31 +196,37 @@ export const FormattingLogic = {
 
             // --- BLOCK A0: 100% COMPLETE (GREEN OVERRIDE) ---
             // This MUST be added first to sit on top of the grey progress bar.
-            console.log("STEP 3a: Applying 100% Green Completion...");
+            // console.log("STEP 3a: Applying 100% Green Completion...");
             const fComplete = gridRange.conditionalFormats.add(Excel.ConditionalFormatType.custom);
             // Logic: Inside Date Range AND % Complete (Col H) >= 1 (100%)
-            fComplete.custom.rule.formula = `=AND(K$6>=$E${r}, K$6<=$F${r}, ISNUMBER($H${r}), $H${r}>=1)`;
-            fComplete.custom.format.fill.color = "#00B050"; // Green
-            fComplete.stopIfTrue = false; // Allow borders to draw on top if needed
+            if(fComplete) {
+                fComplete.custom.rule.formula = `=AND(K$6>=$E${r}, K$6<=$F${r}, ISNUMBER($H${r}), $H${r}>=1)`;
+                fComplete.custom.format.fill.color = "#00B050"; // Green
+                fComplete.stopIfTrue = false; // Allow borders to draw on top if needed
+            }
 
             // --- BLOCK A: STANDARD PROGRESS BAR (PARTIAL) ---
             const fProg = gridRange.conditionalFormats.add(Excel.ConditionalFormatType.custom);
-            fProg.custom.rule.formula = `=AND(K$6>=$E${r}, K$6<=$F${r}, ISNUMBER($H${r}), ((K$6-$E${r})/($F${r}-$E${r}+1)) < $H${r})`;
-            fProg.custom.format.fill.color = "#5a5a5a"; // Dark Grey (User Choice)
-            fProg.stopIfTrue = false;
+            if(fProg) {
+                fProg.custom.rule.formula = `=AND(K$6>=$E${r}, K$6<=$F${r}, ISNUMBER($H${r}), ((K$6-$E${r})/($F${r}-$E${r}+1)) < $H${r})`;
+                fProg.custom.format.fill.color = "#5a5a5a"; // Dark Grey (User Choice)
+                fProg.stopIfTrue = false;
+            }
 
             // --- BLOCK B: TODAY BORDERS ---
             const fToday = gridRange.conditionalFormats.add(Excel.ConditionalFormatType.custom);
-            fToday.custom.rule.formula = '=K$6=TODAY()';
+            if(fToday) {
+                fToday.custom.rule.formula = '=K$6=TODAY()';
             
-            fToday.custom.format.borders.getItem("EdgeLeft").style = Excel.BorderLineStyle.continuous;
-            fToday.custom.format.borders.getItem("EdgeLeft").color = "#FF0000";
-            fToday.custom.format.borders.getItem("EdgeLeft").weight = Excel.BorderWeight.thick;
-            
-            fToday.custom.format.borders.getItem("EdgeRight").style = Excel.BorderLineStyle.continuous;
-            fToday.custom.format.borders.getItem("EdgeRight").color = "#FF0000";
-            fToday.custom.format.borders.getItem("EdgeRight").weight = Excel.BorderWeight.thick;
-            fToday.stopIfTrue = false;
+                fToday.custom.format.borders.getItem("EdgeLeft").style = Excel.BorderLineStyle.continuous;
+                fToday.custom.format.borders.getItem("EdgeLeft").color = "#FF0000";
+                fToday.custom.format.borders.getItem("EdgeLeft").weight = Excel.BorderWeight.thick;
+                
+                fToday.custom.format.borders.getItem("EdgeRight").style = Excel.BorderLineStyle.continuous;
+                fToday.custom.format.borders.getItem("EdgeRight").color = "#FF0000";
+                fToday.custom.format.borders.getItem("EdgeRight").weight = Excel.BorderWeight.thick;
+                fToday.stopIfTrue = false;
+            }
 
             // --- BLOCK C: TEAM COLORS (PROJECT PROTECTED) ---
             if (metadata.teamRules.length > 0) {
@@ -217,50 +235,86 @@ export const FormattingLogic = {
                     
                     // 1. NAME CELL (Strict Task Only)
                     const fName = namesRange.conditionalFormats.add(Excel.ConditionalFormatType.custom);
-                    fName.custom.rule.formula = `=AND(UPPER(TRIM($C${r}))="${safeName}", ISNUMBER(SEARCH(".", $A${r})))`;
-                    fName.custom.format.fill.color = member.color;
-                    fName.stopIfTrue = true;
-
+                    if (fName){
+                        fName.custom.rule.formula = `=AND(UPPER(TRIM($C${r}))="${safeName}", ISNUMBER(SEARCH(".", $A${r})))`;
+                        fName.custom.format.fill.color = member.color;
+                        fName.stopIfTrue = true;
+                    }
+                    
                     // 2. GRID BAR (Strict Task Only)
                     const fBar = gridRange.conditionalFormats.add(Excel.ConditionalFormatType.custom);
-                    fBar.custom.rule.formula = `=AND(ISNUMBER($E${r}), K$6>=$E${r}, K$6<=$F${r}, UPPER(TRIM($C${r}))="${safeName}", ISNUMBER(SEARCH(".", $A${r})))`;
-                    fBar.custom.format.fill.color = member.color;
-                    fBar.stopIfTrue = true; 
+                    if (fBar) {
+                        fBar.custom.rule.formula = `=AND(ISNUMBER($E${r}), K$6>=$E${r}, K$6<=$F${r}, UPPER(TRIM($C${r}))="${safeName}", ISNUMBER(SEARCH(".", $A${r})))`;
+                        fBar.custom.format.fill.color = member.color;
+                        fBar.stopIfTrue = true; 
+                    }
                 }
             }
 
             // --- BLOCK D: GENERIC BLUE ---
             const fBlue = gridRange.conditionalFormats.add(Excel.ConditionalFormatType.custom);
-            fBlue.custom.rule.formula = `=AND(ISNUMBER($E${r}), K$6>=$E${r}, K$6<=$F${r})`; 
-            fBlue.custom.format.fill.color = "#0070C0"; 
-            fBlue.stopIfTrue = true; 
+            if(fBlue) {
+                fBlue.custom.rule.formula = `=AND(ISNUMBER($E${r}), K$6>=$E${r}, K$6<=$F${r})`; 
+                fBlue.custom.format.fill.color = "#0070C0"; 
+                fBlue.stopIfTrue = true; 
+            }
 
             // --- BLOCK E: PARENT ROW ---
             const fParent = gridRange.conditionalFormats.add(Excel.ConditionalFormatType.custom);
-fParent.custom.rule.formula = `=AND($A${r}<>"", ISERROR(SEARCH(".", $A${r})))`;
-            fParent.custom.format.fill.color = "#D9D9D9"; 
-            fParent.stopIfTrue = true; 
+            if(fParent) {
+                fParent.custom.rule.formula = `=AND($A${r}<>"", ISERROR(SEARCH(".", $A${r})))`;
+                fParent.custom.format.fill.color = "#D9D9D9"; 
+                fParent.stopIfTrue = true; 
+            }
             
             const fParentName = namesRange.conditionalFormats.add(Excel.ConditionalFormatType.custom);
-            fParentName.custom.rule.formula = `=AND($A${r}<>"", ISERROR(SEARCH(".", $A${r})))`;
-            fParentName.custom.format.fill.color = "#D9D9D9";
-            fParentName.stopIfTrue = true;
+            if(fParentName) {
+                fParentName.custom.rule.formula = `=AND($A${r}<>"", ISERROR(SEARCH(".", $A${r})))`;
+                fParentName.custom.format.fill.color = "#D9D9D9";
+                fParentName.stopIfTrue = true;
+            }
 
             // --- BLOCK G: HOLIDAYS (SWAPPED UP) ---
             // Using IFERROR/ISERROR safety in case ListHolidays named range doesn't exist yet
             const fHol = gridRange.conditionalFormats.add(Excel.ConditionalFormatType.custom);
-            fHol.custom.rule.formula = '=IFERROR(COUNTIF(ListHolidays,K$6)>0, FALSE)';
-            fHol.custom.format.fill.color = "#C8C8C8"; 
-            fHol.stopIfTrue = false;
+            if(fHol) {
+                try {
+                    const customHol = fHol.custom; // 🛡️ Step 1: Safely read .custom
+                    if(customHol) {
+                        customHol.rule.formula = '=IFERROR(COUNTIF(ListHolidays,K$6)>0, FALSE)';
+
+                        const formatHol = customHol.format; // 🛡️ Step 2: Safely read .format
+                        if (formatHol) {
+                            formatHol.fill.color = "#C8C8C8";
+                        }
+                    }
+                    fHol.stopIfTrue = false;
+                } catch (e) {
+                    console.warn("Skipping Block G format application: Resource not ready yet.");
+                }
+            }
 
             // --- BLOCK F: PTO (SWAPPED DOWN - HIGHER PRIORITY) ---
             for (const pto of metadata.ptoData) {
                 if (pto.name && metadata.officeMap[pto.name] === sheetName && typeof pto.start === 'number') {
                     const end = pto.start + pto.days - 1;
                     const fPTO = gridRange.conditionalFormats.add(Excel.ConditionalFormatType.custom);
-                    fPTO.custom.rule.formula = `=AND(K$6>=${pto.start}, K$6<=${end})`;
-                    fPTO.custom.format.fill.color = "#EAEAEA";
-                    fPTO.stopIfTrue = false;
+                    if(fPTO) {
+                        try {
+                            const customPTO = fPTO.custom; // 🛡️ Safely unpack .custom
+                            if (customPTO) {
+                            customPTO.rule.formula = `=AND(K$6>=${pto.start}, K$6<=${end})`;
+                            
+                            const formatPTO = customPTO.format; // 🛡️ Safely unpack .format
+                            if (formatPTO) {
+                                formatPTO.fill.color = "#EAEAEA";
+                            }
+                            }
+                            fPTO.stopIfTrue = false;
+                        } catch (e) {
+                            console.warn("Skipping individual PTO format mapping line: Resource busy.");
+                        }
+                    }
                 }
             }
             

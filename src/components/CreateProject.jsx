@@ -12,7 +12,7 @@ import { faFolderPlus } from '@fortawesome/free-solid-svg-icons';
 const CreateProject = ({ onProjectCreated }) => {
     // --- STATE ---
     const [teamMembers, setTeamMembers] = useState([]);
-    const [formData, setFormData] = useState({ name: "", lead: "", startDate: "", endDate: "", projectNumber: "", isServiceCall: false, location: "Houston" });
+    const [formData, setFormData] = useState({ name: "", lead: "", startDate: "", endDate: "", etcProjectNumber: "", projectNumber: "", isServiceCall: false, location: "Houston" });
     const [status, setStatus] = useState({ msg: "", variant: "light" });
     const [isLoading, setIsLoading] = useState(false);
 
@@ -119,9 +119,18 @@ const CreateProject = ({ onProjectCreated }) => {
                 projNumHeader.load(["columnIndex", "isNullObject"]);
                 await context.sync();
 
+                const etcProjNumHeader = headerRow.find("ETC Project #", { completeMatch: true, matchCase: false });
+                etcProjNumHeader.load(["columnIndex", "isNullObject"]);
+                await context.sync();
+
                 let projNumCol = 3; // Fallback to index 3 (Col D) if header not found
                 if (!projNumHeader.isNullObject) {
                     projNumCol = projNumHeader.columnIndex;
+                }
+
+                let etcProjNumCol = 3; // Fallback to index 3 (Col D) if header not found
+                if (!etcProjNumHeader.isNullObject) {
+                    etcProjNumCol = etcProjNumHeader.columnIndex;
                 }
 
                 // D. CALCULATE NEXT ID (Matches VBA Logic)
@@ -167,6 +176,13 @@ const CreateProject = ({ onProjectCreated }) => {
                     sheet.getCell(insertRowIndex, projNumCol).clear(Excel.ClearApplyTo.contents);
                 }
 
+                // ETC Project Number (Dynamic Column)
+                if (formData.etcProjectNumber) {
+                    sheet.getCell(insertRowIndex, etcProjNumCol).values = [[formData.etcProjectNumber]];
+                } else {
+                    sheet.getCell(insertRowIndex, etcProjNumCol).clear(Excel.ClearApplyTo.contents);
+                }
+
                 // Col C (Lead)
                 if (formData.lead) {
                     sheet.getCell(insertRowIndex, 2).values = [[formData.lead]];
@@ -204,7 +220,7 @@ const CreateProject = ({ onProjectCreated }) => {
             
             // Trigger refresh AFTER the Excel.run transaction is fully complete
             if (onProjectCreated) {
-                onProjectCreated(createdId, formData.location);
+                onProjectCreated(formData.location, createdId);
             }
         } catch (error) {
             console.error(error);
@@ -316,6 +332,26 @@ const CreateProject = ({ onProjectCreated }) => {
                     label={<span className="small fw-bold">This is a Service Call</span>}
                     checked={formData.isServiceCall}
                     onChange={(e) => handleChange("isServiceCall", e.target.checked)}
+                    disabled={isLoading}
+                />
+            </Form.Group>
+
+            {/* ETC PROJECT NUMBER */}
+            <Form.Group className="mb-2">
+                <Form.Label className="small fw-bold text-muted d-flex">
+                    <Col xs="auto">
+                        ETC PROJECT NUMBER
+                    </Col>
+                    <Col className='ps-2'>
+                        <small><i>*if one</i></small>
+                    </Col>
+                </Form.Label>
+                <Form.Control 
+                    size="sm" 
+                    type="text" 
+                    placeholder="Enter the ETC project number..." 
+                    value={formData.etcProjectNumber}
+                    onChange={(e) => handleChange("etcProjectNumber", e.target.value)}
                     disabled={isLoading}
                 />
             </Form.Group>

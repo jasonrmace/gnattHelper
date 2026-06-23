@@ -68,7 +68,7 @@ const LoadingOverlay = ({ isVisible, message }) => {
 
 function App() {
     // --- STATE ---
-    const [version] = useState("v6.3.0"); 
+    const [version] = useState("v6.3.1"); 
     const [activeTab, setActiveTab] = useState("Home");
     const [isValidFile, setIsValidFile] = useState(false);
     const [currentName, setCurrentName] = useState("");
@@ -151,6 +151,15 @@ function App() {
                 return { total, yours };
             });
         } catch (e) { console.warn("Overdue fetch failed", e); return { total: 0, yours: 0 }; }
+    };
+
+    const handleProjectCreated = (loc, taskId) => {
+        setHighlightId(taskId);
+        setNavResetTrigger(prev => prev + 1);
+        setActiveTab(loc === "Houston" ? "HoustonList" : "DallasList");
+        triggerRefresh();
+        // Clear highlight after 10 seconds so it doesn't persist forever
+        setTimeout(() => setHighlightId(null), 10000);
     };
 
     const fetchUnseenCount = async (clearFirst = false) => {
